@@ -47,3 +47,9 @@ result = await enricher.enrich(release, parsed)
 ```
 
 `parse_title()` is called once per release inside the content router. The result is passed through to the enricher — it is never called twice for the same release.
+
+The parsed fields are then saved to the `releases` table:
+- `parsed.year` → stored separately (currently derived from TMDB enrichment)
+- `parsed.season`, `parsed.episode` → stored in `releases.season`, `releases.episode`
+- `parsed.resolution` → mapped to `releases.quality` ("SD", "HD", "FHD", "UHD")
+- `parsed.release_date` → stored in `releases.date`

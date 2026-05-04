@@ -44,6 +44,7 @@ releases
   raw_category    text
   file_size_bytes bigint
   published_at    timestamptz
+  date            date          -- parsed from title or metadata; nullable
   quality         text          -- "SD" | "HD" | "FHD" | "UHD"
   content_type    text          -- "movie" | "tv" | "xxx" | "music" | "book" | "software" | "other"
   season          int           -- parsed from title for TV releases, nullable
@@ -250,6 +251,27 @@ tpdb_performers
   extra       jsonb         -- measurements, social links, aliases, etc.
   fetched_at  timestamptz
 ```
+
+---
+
+---
+
+## Field Population
+
+When a release is ingested and enriched, fields are populated from multiple sources:
+
+| releases field | Source | Notes |
+|---|---|---|
+| `raw_title` | `RawRelease.raw_title` | Original title from source, never modified |
+| `raw_category` | `RawRelease.raw_category` | Source-specific category string |
+| `file_size_bytes` | `RawRelease.file_size_bytes` | Torrent or usenet total size |
+| `published_at` | `RawRelease.published_at` | Source ingestion timestamp (not release date) |
+| `date` | `ParsedTitle.release_date` | Release date extracted from title; nullable |
+| `quality` | `ParsedTitle.resolution` | Mapped to "SD", "HD", "FHD", "UHD" |
+| `season` | `ParsedTitle.season` | TV only; extracted from S##E## pattern |
+| `episode` | `ParsedTitle.episode` | TV only; extracted from S##E## pattern |
+| `content_type` | Router decision + TMDB/TPDB enrichment | "movie", "tv", "xxx", etc. |
+| `hints` | `RawRelease.hints` | Ingester-supplied metadata (IMDB ID, TMDB ID, etc.) |
 
 ---
 
