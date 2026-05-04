@@ -61,6 +61,7 @@ Debrid API keys are **never in config**. See [api/stremio.md](api/stremio.md).
 | `TMDB_REQUESTS_PER_10S` | `40` | TMDB rate limit |
 | `TPDB_REQUESTS_PER_SECOND` | `5` | TPDB rate limit |
 | `RE_ENRICH_FAILED_AFTER_DAYS` | — | Re-queue `match_failed` releases after N days (disabled if unset) |
+| `TMDB_CAST_LIMIT` | `20` | Max cast members stored per title; `0` = unlimited |
 
 ---
 

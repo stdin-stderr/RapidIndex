@@ -22,6 +22,20 @@ If not set, all releases routed to `TMDB_MOVIE` or `TMDB_TV` are skipped with `m
 
 ---
 
+## Hint-assisted lookup (fast path)
+
+Before fuzzy search, the enricher checks `releases.hints`. If a hint resolves to a definitive TMDB record, the fuzzy search steps are skipped entirely and the match is accepted with `score = 1.0`.
+
+| Hint key | API call | Condition to accept |
+|----------|----------|---------------------|
+| `tmdb_id` | `GET /movie/{id}` or `/tv/{id}` | always (direct record) |
+| `imdb_id` | `GET /find/{id}?external_source=imdb_id` | exactly one result |
+| `tvdb_id` (TV only) | `GET /find/{id}?external_source=tvdb_id` | exactly one result |
+
+If multiple results are returned by a find call, fall through to fuzzy search rather than guessing.
+
+---
+
 ## Search strategy — movies
 
 1. Search TMDB by `ParsedTitle.clean_title + year` (if year is available).
@@ -51,6 +65,22 @@ After a successful match, a second call is made to `/movie/{id}/external_ids` or
 
 ---
 
+## Cast fetch
+
+After a successful title match (whether via hint or fuzzy search), one additional API call fetches the cast:
+
+- Movies: `GET /movie/{tmdb_id}/credits`
+- TV: `GET /tv/{tmdb_id}/credits`
+
+The `cast[]` array is truncated to `TMDB_CAST_LIMIT` entries (ordered by `cast_order`). For each member:
+
+1. Upsert into `tmdb_people` on `tmdb_person_id` — update name, profile_path, popularity if changed.
+2. Insert into `tmdb_metadata_cast` (character, cast_order) — ignore on conflict.
+
+This call is skipped if `tmdb_metadata` already has a cast row for this title (i.e., another release matched the same title earlier). Rate-limit cost is +1 request per unique title, not per release.
+
+---
+
 ## Stored metadata
 
 Written to `tmdb_metadata` and linked via `release_tmdb_titles`:
@@ -61,3 +91,5 @@ Written to `tmdb_metadata` and linked via `release_tmdb_titles`:
 - `release_year`, `rating`, `genres`
 - `poster_path`, `backdrop_path`
 - `extra` JSONB: season count, episode count, networks (TV only)
+
+Cast written to `tmdb_people` + `tmdb_metadata_cast` (see Cast fetch above).

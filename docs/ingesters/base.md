@@ -29,7 +29,21 @@ class RawRelease:
     newsgroup: str | None
     nzb_segments: str | None    # pipe-delimited NNTP message-IDs: "<a@n>|<b@n>|"
     poster: str | None
+
+    # Optional enrichment hints (ingester sets only what it can reliably extract)
+    hints: dict[str, str] | None = None
 ```
+
+### Hint keys
+
+| Key | Example | Effect |
+|-----|---------|--------|
+| `imdb_id` | `"tt2140479"` | TMDB enricher skips fuzzy search, does direct find-by-IMDB call |
+| `tmdb_id` | `"12345"` | TMDB enricher fetches the record directly, score = 1.0 |
+| `tvdb_id` | `"67890"` | TMDB enricher does find-by-TVDB call (TV releases only) |
+| `content_type` | `"movie"` / `"tv"` / `"xxx"` | Content router uses this before all other rules |
+
+Ingesters set only the keys they can extract reliably. Unknown keys are stored and silently ignored by the pipeline. Hints are written once at index time and never overwritten on re-upsert of the same `source_key`.
 
 ---
 

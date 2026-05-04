@@ -35,6 +35,7 @@ Rules are evaluated in priority order. First match wins.
 
 | Priority | Condition | Result |
 |----------|-----------|--------|
+| 0 | `hints.content_type` is set to a valid value | that type (overrides all below) |
 | 1 | `raw_category == "xxx"` (Spotnet cat. 7) | `TPDB` |
 | 2 | `source_name == "xxxclub"` | `TPDB` |
 | 3 | `source_name` starts with `"generic:"` and site config sets `content_type="xxx"` | `TPDB` |
@@ -43,6 +44,8 @@ Rules are evaluated in priority order. First match wins.
 | 6 | `raw_category` maps to TV | `TMDB_TV` |
 | 7 | `ParsedTitle.season` is not None | `TMDB_TV` |
 | 8 | Fallback | `TMDB_MOVIE` |
+
+Valid `hints.content_type` values: `"movie"` → `TMDB_MOVIE`, `"tv"` → `TMDB_TV`, `"xxx"` → `TPDB`. Other values are ignored and routing falls through to priority 1.
 
 ---
 

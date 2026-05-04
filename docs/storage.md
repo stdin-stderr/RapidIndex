@@ -49,6 +49,9 @@ releases
   season          int           -- parsed from title for TV releases, nullable
   episode         int           -- parsed from title for TV releases, nullable
 
+  -- Ingester-supplied hints (written once at index time, never overwritten on re-upsert)
+  hints           jsonb         -- e.g. {"imdb_id": "tt1234567", "tmdb_id": "12345", "content_type": "movie"}
+
   -- Enrichment status
   enricher        text          -- "tmdb_movie" | "tmdb_tv" | "tpdb" | "skip"
   metadata_status text          -- "pending" | "matched" | "skipped" | "match_failed"
@@ -142,6 +145,37 @@ release_tmdb_titles
 
 ---
 
+### `tmdb_people`
+Actor profiles, shared across all titles. One row per unique TMDB person ID. Updated on re-encounter if profile data has changed.
+
+```
+tmdb_people
+  id              serial PK
+  tmdb_person_id  int UNIQUE NOT NULL
+  name            text NOT NULL
+  profile_path    text
+  popularity      float
+  imdb_id         text
+  extra           jsonb         -- gender, known_for_department, homepage, etc.
+  fetched_at      timestamptz
+```
+
+---
+
+### `tmdb_metadata_cast`
+Links actors to the titles they appear in, with character name and billing order. One row per (title, actor) pair.
+
+```
+tmdb_metadata_cast
+  tmdb_metadata_id  int FK → tmdb_metadata(id) ON DELETE CASCADE
+  tmdb_person_id    int FK → tmdb_people(tmdb_person_id) ON DELETE CASCADE
+  character         text          -- character name as credited (nullable — some cast entries have none)
+  cast_order        int           -- position in TMDB cast list; 0 = top-billed
+  PRIMARY KEY (tmdb_metadata_id, tmdb_person_id)
+```
+
+---
+
 ### `tpdb_scenes`
 One row per unique TPDB scene or movie. Multiple releases (different torrents or usenet posts
 of the same scene) can link to the same `tpdb_scenes` row via `release_tpdb_scenes`.
@@ -228,3 +262,4 @@ tpdb_performers
 | `release_repo.py` | Query/upsert releases + side-tables; filter by source, content type, quality, search term |
 | `scene_repo.py` | Query tpdb_scenes with performer/site/tag filters |
 | `performer_repo.py` | Query tpdb_performers with name search |
+| `people_repo.py` | Upsert tmdb_people; query cast list for a given tmdb_metadata_id |

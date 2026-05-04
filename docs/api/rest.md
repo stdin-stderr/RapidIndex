@@ -40,6 +40,22 @@ GET /api/v1/titles
 
 Returns TMDB metadata rows. Each result includes a `releases` count — how many indexed releases link to this title.
 
+```
+GET /api/v1/titles/:tmdb_id/cast
+```
+
+Returns the cast list for a title, ordered by `cast_order`. Each entry includes `tmdb_person_id`, `name`, `character`, `cast_order`, and `profile_path`.
+
+---
+
+## TMDB People
+
+```
+GET /api/v1/people/:tmdb_person_id
+```
+
+Returns a person's profile plus a list of titles they appear in (from `tmdb_metadata_cast`), ordered by `cast_order`.
+
 ---
 
 ## NSFW Scenes
