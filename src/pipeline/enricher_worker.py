@@ -38,19 +38,20 @@ _BATCH_SIZE = 10
 _SLEEP_EMPTY = 5.0
 
 
-def _build_enrichers(settings: Settings) -> dict[EnricherType, Enricher]:
+def _build_enrichers(settings: Settings, enricher_filter: str) -> dict[EnricherType, Enricher]:
     client = get_client()
-    tmdb = TMDBEnricher(settings, client)
-    enrichers: dict[EnricherType, Enricher] = {
-        EnricherType.TMDB_MOVIE: tmdb,
-        EnricherType.TMDB_TV: tmdb,
-    }
-    if settings.tpdb_api_key:
-        try:
-            from src.enrichers.tpdb import TPDBEnricher
-            enrichers[EnricherType.TPDB] = TPDBEnricher(settings, client)
-        except ModuleNotFoundError:
-            log.warning("tpdb_api_key is set but src/enrichers/tpdb.py is not implemented yet — skipping TPDB enricher")
+    enrichers: dict[EnricherType, Enricher] = {}
+    if enricher_filter == "tmdb":
+        tmdb = TMDBEnricher(settings, client)
+        enrichers[EnricherType.TMDB_MOVIE] = tmdb
+        enrichers[EnricherType.TMDB_TV] = tmdb
+    elif enricher_filter == "tpdb":
+        if settings.tpdb_api_key:
+            try:
+                from src.enrichers.tpdb import TPDBEnricher
+                enrichers[EnricherType.TPDB] = TPDBEnricher(settings, client)
+            except ModuleNotFoundError:
+                log.warning("tpdb_api_key is set but src/enrichers/tpdb.py is not implemented yet — skipping TPDB enricher")
     return enrichers
 
 
@@ -255,14 +256,15 @@ async def _process_item(
         await fail_enrichment(session, item.id, release.id, retry_after)
 
 
-async def run_worker(session_factory, settings: Settings) -> None:
+async def run_worker(session_factory, settings: Settings, enricher_filter: str) -> None:
     """Drain the pending_enrichment queue forever."""
-    enrichers = _build_enrichers(settings)
-    log.info("Enricher worker started (batch=%d, max_attempts=%d)", _BATCH_SIZE, _MAX_ATTEMPTS)
+    enrichers = _build_enrichers(settings, enricher_filter)
+    enricher_type_strings = [e.value for e in enrichers]
+    log.info("Enricher worker started (filter=%s, batch=%d, max_attempts=%d)", enricher_filter, _BATCH_SIZE, _MAX_ATTEMPTS)
 
     while True:
         async with session_factory() as session:
-            batch = await claim_enrichment_batch(session, batch_size=_BATCH_SIZE)
+            batch = await claim_enrichment_batch(session, batch_size=_BATCH_SIZE, enricher_types=enricher_type_strings)
 
         if not batch:
             await asyncio.sleep(_SLEEP_EMPTY)
@@ -274,12 +276,3 @@ async def run_worker(session_factory, settings: Settings) -> None:
                     await _process_item(session, item, settings, enrichers)
                 except Exception as exc:
                     log.exception("unexpected error processing item %d: %s", item.id, exc)
-
-
-async def run_workers(session_factory, settings: Settings) -> None:
-    """Launch N concurrent worker tasks."""
-    tasks = [
-        asyncio.create_task(run_worker(session_factory, settings))
-        for _ in range(settings.enricher_workers)
-    ]
-    await asyncio.gather(*tasks)

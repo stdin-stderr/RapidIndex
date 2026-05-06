@@ -93,6 +93,43 @@ class HttpClient:
 
         raise RuntimeError(f"Exhausted retries for {url}")  # unreachable
 
+    async def fetch_text(self, url: str, **kwargs) -> str:
+        """GET url, returning raw text. No caching."""
+        session = self._get_session()
+        backoff = _BASE_BACKOFF
+
+        for attempt in range(1, _MAX_RETRIES + 1):
+            try:
+                async with session.get(url, **kwargs) as resp:
+                    if resp.status == 429:
+                        retry_after = float(resp.headers.get("Retry-After", backoff))
+                        logger.debug("429 from %s, waiting %.1fs", url, retry_after)
+                        await asyncio.sleep(retry_after)
+                        backoff = min(backoff * 2, 60)
+                        continue
+
+                    if resp.status >= 500:
+                        if attempt == _MAX_RETRIES:
+                            resp.raise_for_status()
+                        logger.debug("5xx from %s (attempt %d), backing off %.1fs", url, attempt, backoff)
+                        await asyncio.sleep(backoff)
+                        backoff = min(backoff * 2, 60)
+                        continue
+
+                    resp.raise_for_status()
+                    return await resp.text()
+
+            except aiohttp.ClientResponseError:
+                raise
+            except aiohttp.ClientError as exc:
+                if attempt == _MAX_RETRIES:
+                    raise
+                logger.debug("Client error on %s (attempt %d): %s", url, attempt, exc)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 60)
+
+        raise RuntimeError(f"Exhausted retries for {url}")  # unreachable
+
     async def close(self) -> None:
         if self._session and not self._session.closed:
             await self._session.close()

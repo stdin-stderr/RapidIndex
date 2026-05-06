@@ -3,7 +3,8 @@
 Usage:
     python main.py ingester spotnet
     python main.py ingester xxxclub
-    python main.py worker
+    python main.py worker tmdb
+    python main.py worker tpdb
     python main.py api
     python main.py all          # dev only — runs everything in one process
 """
@@ -26,11 +27,11 @@ def _session_factory():
     return get_session_factory()
 
 
-async def run_worker_mode() -> None:
+async def run_worker_mode(enricher_filter: str) -> None:
     from src.config import settings
-    from src.pipeline.enricher_worker import run_workers
-    log.info("Starting enricher worker")
-    await run_workers(_session_factory(), settings)
+    from src.pipeline.enricher_worker import run_worker
+    log.info("Starting enricher worker (%s)", enricher_filter)
+    await run_worker(_session_factory(), settings, enricher_filter)
 
 
 async def run_ingester(name: str) -> None:
@@ -43,6 +44,9 @@ async def run_ingester(name: str) -> None:
             sys.exit(1)
         from src.ingesters.usenet.spotnet import SpotnetIngester
         ingesters = [SpotnetIngester(settings, _session_factory())]
+    elif name == "xxxclub":
+        from src.ingesters.torrent.xxxclub import XXXClubIngester
+        ingesters = [XXXClubIngester(settings, _session_factory())]
     else:
         log.error("Unknown ingester: %s", name)
         sys.exit(1)
@@ -65,7 +69,10 @@ def main() -> None:
         asyncio.run(run_ingester(sys.argv[2]))
 
     elif mode == "worker":
-        asyncio.run(run_worker_mode())
+        if len(sys.argv) < 3 or sys.argv[2] not in ("tmdb", "tpdb"):
+            log.error("Usage: python main.py worker <tmdb|tpdb>")
+            sys.exit(1)
+        asyncio.run(run_worker_mode(sys.argv[2]))
 
     elif mode == "api":
         import uvicorn

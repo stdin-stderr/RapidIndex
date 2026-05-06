@@ -25,14 +25,6 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # test-spotnet:
-  #   build: .
-  #   command: python test_spotnet.py
-  #   env_file: .env
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-
   api:
     build: .
     command: python main.py api
@@ -43,9 +35,17 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  worker:
+  worker-tmdb:
     build: .
-    command: python main.py worker
+    command: python main.py worker tmdb
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker-tpdb:
+    build: .
+    command: python main.py worker tpdb
     env_file: .env
     depends_on:
       migrate:
@@ -59,13 +59,14 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # ingester-xxxclub:
-  #   build: .
-  #   command: python main.py ingester xxxclub
-  #   env_file: .env
-  #   depends_on:
-  #     migrate:
-  #       condition: service_completed_successfully
+  ingester-xxxclub:
+    build: .
+    command: python main.py ingester xxxclub
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 
 volumes:
   db_data:

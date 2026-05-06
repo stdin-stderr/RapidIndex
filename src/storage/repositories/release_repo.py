@@ -258,7 +258,10 @@ async def query_tpdb_releases(
 
 
 async def claim_enrichment_batch(
-    session: AsyncSession, batch_size: int = 10, lease_minutes: int = 5
+    session: AsyncSession,
+    batch_size: int = 10,
+    lease_minutes: int = 5,
+    enricher_types: list[str] | None = None,
 ) -> list[PendingEnrichment]:
     """Atomically claim a batch and stamp a lease so other workers skip them.
 
@@ -269,12 +272,13 @@ async def claim_enrichment_batch(
     now = datetime.now(timezone.utc)
     lease_until = now + timedelta(minutes=lease_minutes)
 
+    ready = (
+        (PendingEnrichment.next_attempt == None)  # noqa: E711
+        | (PendingEnrichment.next_attempt <= now)
+    )
     cte = (
         select(PendingEnrichment.id)
-        .where(
-            (PendingEnrichment.next_attempt == None)  # noqa: E711
-            | (PendingEnrichment.next_attempt <= now)
-        )
+        .where(ready if enricher_types is None else ready & PendingEnrichment.enricher.in_(enricher_types))
         .limit(batch_size)
         .with_for_update(skip_locked=True)
         .cte("claimed")

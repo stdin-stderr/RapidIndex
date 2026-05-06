@@ -186,36 +186,27 @@ Concurrency: `asyncio.gather(*[run_worker(...) for _ in range(settings.enricher_
 
 ---
 
-### Step 5 — xxxclub ingester  ⏳ TODO
-**Status:** Not started  |  **File:** `src/ingesters/torrent/xxxclub.py` (not yet created)
+### Step 5 — xxxclub ingester  ✅ DONE
+**Status:** Complete  |  **File:** `src/ingesters/torrent/xxxclub.py`
 
-**Blockers:** None — independent of enrichers, can be built anytime.
+Iterates sequentially through detail pages `https://xxxclub.to/torrents/details/{id}` (IDs 1–428604+).
+Resumable via integer watermark in `scan_state`. Stops after `XXXCLUB_CONSECUTIVE_ERROR_LIMIT` (default 100) consecutive error pages.
 
-Spec: `docs/ingesters/xxxclub.md`
+**Approach (changed from spec):** Detail-page scraper instead of browse/top100 — allows extracting the files list which is not available on archive pages.
 
-```python
-class XXXClubIngester(Ingester):
-    source_name = "xxxclub"
-    # Scrapes /torrents/browse/all/ (paginated) + /torrents/top100/*
-    # Uses src/utils/http.py:HttpClient for aiohttp requests
-    # Parses HTML with BeautifulSoup (add beautifulsoup4/lxml to pyproject.toml)
-    # Watermark: ISO date of newest date_added seen
-    # source_key = info_hash (40-char hex)
-    # Yields RawRelease(source_type="torrent", source_name="xxxclub", ...)
-```
+**Extracted fields:** title, category, size, date, seeders, leechers, info_hash, magnet URI, files list (filename + size + index), poster URL, uploader, collection, downloads count.
 
-Enable in `.env`:
+**Config:**
 ```env
-XXXCLUB_ENABLED=true
+XXXCLUB_START_ID=1               # first ID if no watermark
+XXXCLUB_REQUEST_DELAY_MS=1000    # delay between pages (default 1s)
+XXXCLUB_CONSECUTIVE_ERROR_LIMIT=100
 ```
 
-Enable in `docker-compose.yml` (already stubbed, commented out):
-```yaml
-ingester-xxxclub:
-  command: python main.py ingester xxxclub
-```
+**Docker service:** `ingester-xxxclub` — active in `docker-compose.yml`.
 
-Add to `main.py` ingester dispatch alongside spotnet.
+**Dependencies added:** `beautifulsoup4>=4.12`, `lxml>=5.0` (pyproject.toml).
+`HttpClient.fetch_text()` added to `src/utils/http.py` for HTML responses (no Redis cache).
 
 ---
 

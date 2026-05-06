@@ -8,8 +8,9 @@ Unified usenet + torrent pre-indexer with metadata enrichment. Background worker
 docs/              Full architecture docs (start here for context)
 src/
   storage/         Migrations, repositories, models, DB engine
-  ingesters/       Spotnet ingester; xxxclub (TODO: Step 5)
+  ingesters/       Spotnet ingester; xxxclub torrent ingester
     usenet/        NNTP client, Spotnet ingester, NZB builder
+    torrent/       xxxclub detail-page ingester
   pipeline/        Scheduler, queue logic, enricher worker
   enrichers/       TMDB (movies/TV), TPDB (adult); extensible registry
   routing/         Content type router (media type detection)
@@ -29,7 +30,7 @@ Ingester → RawRelease → pending_enrichment queue → Enricher Worker → rel
 
 ## Implementation Status
 
-**6 of 8 build steps complete.** See `strategy.md` for detailed progress.
+**7 of 8 build steps complete.** See `strategy.md` for detailed progress.
 
 | Step | Component | Status | Details |
 |------|-----------|--------|---------|
@@ -37,12 +38,12 @@ Ingester → RawRelease → pending_enrichment queue → Enricher Worker → rel
 | 2 | Content router | ✅ Done | `src/routing/content_router.py` — Routes to TMDB_MOVIE/TMDB_TV/TPDB/SKIP |
 | 3a-c | Enrichers (TMDB, TPDB) | ✅ Done | `src/enrichers/{base,tmdb,tpdb}.py` — Metadata matching with scoring |
 | 4 | Enricher worker | ✅ Done | `src/pipeline/enricher_worker.py` — Queue processor with retry logic |
-| 5 | xxxclub ingester | ⏳ TODO | Blocked on Step 5 only; no other dependencies |
+| 5 | xxxclub ingester | ✅ Done | `src/ingesters/torrent/xxxclub.py` — Detail-page scraper, ID-based, resumable |
 | 6 | REST + Newznab + Torznab API | ✅ Done | `src/api/` with 8 routers; fully functional |
-| 7 | Stremio addon | ⏳ TODO | Blocked on Step 5 (torrent streams required) |
-| 8 | Docker + main.py wiring | 🔄 Partial | API/worker/Spotnet services running; needs xxxclub + Stremio |
+| 7 | Stremio addon | ⏳ TODO | Can now be built (torrent streams available via xxxclub) |
+| 8 | Docker + main.py wiring | 🔄 Partial | All services running; Stremio addon still pending |
 
-**Known working:** 131+ releases indexed from Spotnet, enriched with TMDB/TPDB, searchable via REST/Newznab/Torznab.
+**Known working:** 131+ releases indexed from Spotnet, enriched with TMDB/TPDB, searchable via REST/Newznab/Torznab. xxxclub torrent ingester live and backfilling 428k+ releases.
 
 ## Schema: core table + source side-tables
 
@@ -125,9 +126,10 @@ Each component runs as its own process and Docker service:
 
 ```
 python main.py api                  # ✅ REST + Newznab/Torznab (Stremio: TODO Step 7)
-python main.py worker               # ✅ enrichment workers only
+python main.py worker tmdb          # ✅ TMDB enrichment worker
+python main.py worker tpdb          # ✅ TPDB enrichment worker
 python main.py ingester spotnet     # ✅ Spotnet/NNTP ingester
-python main.py ingester xxxclub     # ⏳ xxxclub torrent ingester (TODO Step 5)
+python main.py ingester xxxclub     # ✅ xxxclub torrent ingester (detail-page, resumable)
 python main.py all                  # everything in one process (dev only)
 ```
 
