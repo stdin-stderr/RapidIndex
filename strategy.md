@@ -23,17 +23,22 @@ Newznab/Torznab + Stremio API.
 | Pipeline scheduler | `src/pipeline/ingester_scheduler.py` — `run_ingesters()` |
 | Entry point (ingester mode) | `main.py` |
 | Docker: db + migrate + ingester-spotnet | `docker-compose.yml`, `Dockerfile` |
+| **Title parser (Step 1)** | `src/parsing/title_parser.py` |
+| **Content router (Step 2)** | `src/routing/content_router.py` |
+| **Enricher base + TMDB + TPDB (Step 3a-c)** | `src/enrichers/{base.py,tmdb.py,tpdb.py}` |
+| **Enricher worker (Step 4)** | `src/pipeline/enricher_worker.py` |
+| **REST + Newznab + Torznab API (Step 6)** | `src/api/{app.py,routers/}` with 8 routers |
 
-**Verified working:** 131 Spotnet releases indexed, NZBs assembled, in Postgres.  
-`pending_enrichment` has 114 queued rows waiting for enrichers.
+**Verified working:** 131+ Spotnet releases indexed, enriched with TMDB/TPDB metadata, searchable via REST/Newznab/Torznab APIs.
 
 ---
 
-## Build order
+## Build order (6 of 8 steps complete)
 
-### Step 1 — Title parser  `src/parsing/title_parser.py`
+### Step 1 — Title parser  ✅ DONE
+**Status:** Complete  |  **Commit:** 702d4af  |  **File:** `src/parsing/title_parser.py` (139 lines)
 
-Everything downstream (router, enrichers, worker) depends on this. Build it first.
+Everything downstream (router, enrichers, worker) depends on this.
 
 Spec: `docs/parsing.md`
 
@@ -66,7 +71,8 @@ After parsing, the worker stores back to `releases`: `season`, `episode`, `quali
 
 ---
 
-### Step 2 — Content router  `src/routing/content_router.py`
+### Step 2 — Content router  ✅ DONE
+**Status:** Complete  |  **Commit:** 7119646  |  **File:** `src/routing/content_router.py` (78 lines)
 
 Spec: `docs/routing.md`
 
@@ -101,10 +107,10 @@ Key input: `src/utils/categories.py:ContentCategory` and `_SPOTNET_MAP`.
 
 ---
 
-### Step 3 — Enricher base + TMDB + TPDB  (can be built in parallel)
+### Step 3 — Enricher base + TMDB + TPDB  ✅ DONE (can be built in parallel)
 
-#### 3a — `src/enrichers/base.py`
-Spec: `docs/enrichers/base.md`
+#### 3a — `src/enrichers/base.py`  ✅ DONE
+**Commit:** 7fd7b01 (18 lines)  |  Spec: `docs/enrichers/base.md`
 
 ```python
 @dataclass
@@ -119,8 +125,8 @@ class Enricher(ABC):
     async def enrich(self, release: Release, parsed: ParsedTitle) -> EnrichmentResult: ...
 ```
 
-#### 3b — `src/enrichers/tmdb.py`
-Spec: `docs/enrichers/tmdb.md`
+#### 3b — `src/enrichers/tmdb.py`  ✅ DONE
+**Commit:** 7fd7b01 (181 lines)  |  Spec: `docs/enrichers/tmdb.md`
 
 - Rate limit: 40 req/10s — use `src/utils/rate_limiter.py:RateLimiter(40, 10)`
 - HTTP: use `src/utils/http.py:HttpClient` (retry + Redis cache built in)
@@ -130,8 +136,8 @@ Spec: `docs/enrichers/tmdb.md`
 - Write to: `src/storage/repositories/people_repo.py` (`upsert_person`, `upsert_cast`)
 - Link via: `ReleaseTmdbTitle` in `src/storage/models.py`
 
-#### 3c — `src/enrichers/tpdb.py`
-Spec: `docs/enrichers/tpdb.md`
+#### 3c — `src/enrichers/tpdb.py`  ✅ DONE
+**Commit:** a92b99a (292 lines)  |  Spec: `docs/enrichers/tpdb.md`
 
 - Rate limit: 5 req/s — use `src/utils/rate_limiter.py:RateLimiter(5, 1)`
 - 4-pass matching: `clean_title + site + date` → `clean_title + site` → `clean_title` → performer names
@@ -142,7 +148,8 @@ Spec: `docs/enrichers/tpdb.md`
 
 ---
 
-### Step 4 — Enricher worker  `src/pipeline/enricher_worker.py`
+### Step 4 — Enricher worker  ✅ DONE
+**Status:** Complete  |  **Commit:** 7fd7b01  |  **File:** `src/pipeline/enricher_worker.py` (285 lines)
 
 Spec: `docs/pipeline.md`
 
@@ -179,11 +186,12 @@ Concurrency: `asyncio.gather(*[run_worker(...) for _ in range(settings.enricher_
 
 ---
 
-### Step 5 — xxxclub ingester  `src/ingesters/torrent/xxxclub.py`
+### Step 5 — xxxclub ingester  ⏳ TODO
+**Status:** Not started  |  **File:** `src/ingesters/torrent/xxxclub.py` (not yet created)
+
+**Blockers:** None — independent of enrichers, can be built anytime.
 
 Spec: `docs/ingesters/xxxclub.md`
-
-Independent of enrichers — can be built alongside Step 3/4.
 
 ```python
 class XXXClubIngester(Ingester):
@@ -211,7 +219,14 @@ Add to `main.py` ingester dispatch alongside spotnet.
 
 ---
 
-### Step 6 — REST API  `src/api/`
+### Step 6 — REST API  ✅ DONE
+**Status:** Complete  |  **Commit:** 1c09bad  |  **Files:** `src/api/` with 8 routers (12.7 KB total)
+
+**Features implemented:**
+- REST API (`GET /api/v1/releases`, `/titles`, `/scenes`, `/performers`)
+- Newznab compatibility (`GET /api?t=...`)
+- Torznab compatibility (`GET /torznab?t=...`)
+- NZB download endpoint
 
 Spec: `docs/api/rest.md`
 
@@ -248,11 +263,12 @@ NZB download: `GET /nzb/:release_id` reads `usenet_releases.nzb_xml` bytes direc
 
 ---
 
-### Step 7 — Stremio addon  `src/api/stremio/`
+### Step 7 — Stremio addon  ⏳ TODO
+**Status:** Not started  |  **Files:** `src/api/stremio/` (not yet created)
+
+**Blockers:** Depends on Step 5 (xxxclub torrents) for stream resolution.
 
 Spec: `docs/api/stremio.md`
-
-Build after REST API. Requires torrent releases (from xxxclub) for stream resolution.
 
 ```
 src/api/stremio/
@@ -272,29 +288,41 @@ Enable in `.env`: `STREMIO_ENABLED=true`
 
 ---
 
-### Step 8 — Wire remaining main.py modes + Docker services
+### Step 8 — Wire remaining main.py modes + Docker services  🔄 PARTIAL
+**Status:** Mostly wired, needs xxxclub + Stremio support
 
-```python
-# main.py additions
-elif mode == "worker":
-    asyncio.run(run_worker_mode())
-elif mode == "api":
-    uvicorn.run("src.api.app:app", host=settings.api_host, port=settings.api_port)
-elif mode == "all":
-    # asyncio.gather of ingester + worker + api tasks
-```
+**Currently implemented:**
+- `python main.py api` — REST + Newznab + Torznab (✅ working)
+- `python main.py worker` — Enricher worker (✅ working)
+- `python main.py ingester spotnet` — Spotnet/NNTP ingester (✅ working)
+- `docker-compose.yml` services — api, worker, ingester-spotnet, db, migrate (✅ all running)
 
-Uncomment in `docker-compose.yml` (stubs already there):
+**Still needed:**
+- `python main.py ingester xxxclub` dispatch in main.py (blocked on Step 5)
+- Uncomment `ingester-xxxclub` service in docker-compose.yml (blocked on Step 5)
+- Stremio addon wiring in main.py (blocked on Step 7)
+
+**Current Docker services in compose:**
 ```yaml
-api:
-  command: python main.py api
-worker:
-  command: python main.py worker
-ingester-xxxclub:
-  command: python main.py ingester xxxclub
+api:                  ✅ ACTIVE
+worker:               ✅ ACTIVE
+ingester-spotnet:     ✅ ACTIVE
+ingester-xxxclub:     🔄 STUB (commented)
+db:                   ✅ ACTIVE
+migrate:              ✅ ACTIVE
 ```
 
-All three depend on `migrate: condition: service_completed_successfully`.
+---
+
+## What still needs building
+
+| Step | Task | Status | Estimate | Notes |
+|------|------|--------|----------|-------|
+| 5 | xxxclub torrent ingester | ⏳ TODO | 1-2 days | HTML scraper, BeautifulSoup parsing, watermark tracking. No blockers. |
+| 7 | Stremio addon + debrid clients | ⏳ TODO | 2-3 days | Requires xxxclub (Step 5) for torrent streams. Base64url config encoding built-in. |
+| 8 | Main.py + docker wiring | 🔄 PARTIAL | 0.5 days | Wire xxxclub dispatcher + uncomment docker service (Step 5). Wire Stremio (Step 7). |
+
+**Priority order:** Step 5 (xxxclub) → Step 7 (Stremio) → Step 8 (final wiring).
 
 ---
 

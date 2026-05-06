@@ -5,15 +5,20 @@ Unified usenet + torrent pre-indexer with metadata enrichment. Background worker
 ## Project layout
 
 ```
-docs/           Full architecture docs (start here for context)
+docs/              Full architecture docs (start here for context)
 src/
-  ingesters/    One file per source: spotnet.py, xxxclub.py
-  pipeline/     Scheduler, queue logic, enricher worker
-  enrichers/    tmdb.py (SFW), tpdb.py (NSFW)
-  parser/       Unified title parser
-  api/          REST, Newznab+Torznab, Stremio handlers
-  db/           Migrations, repositories, schema
-main.py         Entry point — see "Running services" below
+  storage/         Migrations, repositories, models, DB engine
+  ingesters/       Spotnet ingester; xxxclub (TODO: Step 5)
+    usenet/        NNTP client, Spotnet ingester, NZB builder
+  pipeline/        Scheduler, queue logic, enricher worker
+  enrichers/       TMDB (movies/TV), TPDB (adult); extensible registry
+  routing/         Content type router (media type detection)
+  parsing/         Unified title parser (season/episode, quality, release group)
+  api/             REST + Newznab + Torznab (Stremio addon TODO: Step 7)
+  utils/           Rate limiter, HTTP client, categories
+  nzb/             NZB XML builder
+  config.py        Settings from environment
+main.py            Entry point — supports api, worker, ingester, all modes
 ```
 
 ## Data flow
@@ -21,6 +26,23 @@ main.py         Entry point — see "Running services" below
 ```
 Ingester → RawRelease → pending_enrichment queue → Enricher Worker → releases table → API
 ```
+
+## Implementation Status
+
+**6 of 8 build steps complete.** See `strategy.md` for detailed progress.
+
+| Step | Component | Status | Details |
+|------|-----------|--------|---------|
+| 1 | Title parser | ✅ Done | `src/parsing/title_parser.py` — Parses season/episode, quality, release groups |
+| 2 | Content router | ✅ Done | `src/routing/content_router.py` — Routes to TMDB_MOVIE/TMDB_TV/TPDB/SKIP |
+| 3a-c | Enrichers (TMDB, TPDB) | ✅ Done | `src/enrichers/{base,tmdb,tpdb}.py` — Metadata matching with scoring |
+| 4 | Enricher worker | ✅ Done | `src/pipeline/enricher_worker.py` — Queue processor with retry logic |
+| 5 | xxxclub ingester | ⏳ TODO | Blocked on Step 5 only; no other dependencies |
+| 6 | REST + Newznab + Torznab API | ✅ Done | `src/api/` with 8 routers; fully functional |
+| 7 | Stremio addon | ⏳ TODO | Blocked on Step 5 (torrent streams required) |
+| 8 | Docker + main.py wiring | 🔄 Partial | API/worker/Spotnet services running; needs xxxclub + Stremio |
+
+**Known working:** 131+ releases indexed from Spotnet, enriched with TMDB/TPDB, searchable via REST/Newznab/Torznab.
 
 ## Schema: core table + source side-tables
 
@@ -102,10 +124,10 @@ ENRICHERS = {
 Each component runs as its own process and Docker service:
 
 ```
-python main.py api                  # REST + Newznab/Torznab + Stremio
-python main.py worker               # enrichment workers only
-python main.py ingester spotnet     # Spotnet/NNTP ingester
-python main.py ingester xxxclub     # xxxclub torrent ingester
+python main.py api                  # ✅ REST + Newznab/Torznab (Stremio: TODO Step 7)
+python main.py worker               # ✅ enrichment workers only
+python main.py ingester spotnet     # ✅ Spotnet/NNTP ingester
+python main.py ingester xxxclub     # ⏳ xxxclub torrent ingester (TODO Step 5)
 python main.py all                  # everything in one process (dev only)
 ```
 
@@ -135,12 +157,16 @@ For tesing, use .venv:
 
 ## APIs
 
-- `GET /api/v1/releases` — filterable release list
-- `GET /api/v1/titles` — TMDB titles
-- `GET /api/v1/scenes` + `/performers` — TPDB entities
-- `/api?t=...` — Newznab (Sonarr/Radarr/SABnzbd compatible)
-- `/torznab?t=...` — Torznab (Prowlarr/Jackett compatible)
-- `/stremio/{config}/` — Stremio addon with debrid stream resolution
+**Implemented & working:**
+- ✅ `GET /api/v1/releases` — filterable release list
+- ✅ `GET /api/v1/titles` — TMDB titles with cast
+- ✅ `GET /api/v1/scenes` + `/performers` — TPDB entities
+- ✅ `/api?t=...` — Newznab (Sonarr/Radarr/SABnzbd compatible)
+- ✅ `/torznab?t=...` — Torznab (Prowlarr/Jackett compatible)
+- ✅ `GET /nzb/:release_id` — NZB download
+
+**In development:**
+- ⏳ `/stremio/{config}/` — Stremio addon (blocked on Step 5: xxxclub torrents)
 
 ## Docs index
 
