@@ -70,14 +70,14 @@ async def torznab(
         )
         return await _feed(session, releases)
 
-    if t in ("movie", "movie-search"):
+    if t in ("movie", "movie-search", "moviesearch"):
         releases = await query_tmdb_releases(
             session, tmdb_id=tmdbid, imdb_id=imdbid, q=q,
             content_type="movie", source_type="torrent", limit=limit, offset=offset,
         )
         return await _feed(session, releases)
 
-    if t in ("tvsearch", "tv-search"):
+    if t in ("tv", "tvsearch", "tv-search"):
         releases = await query_tmdb_releases(
             session, tmdb_id=tmdbid, imdb_id=imdbid, tvdb_id=tvdbid,
             q=q, content_type="tv", season=season, episode=ep,
@@ -85,7 +85,7 @@ async def torznab(
         )
         return await _feed(session, releases)
 
-    if t in ("adult-search", "adultsearch"):
+    if t in ("adult", "adult-search", "adultsearch"):
         releases = await query_tpdb_releases(
             session, tpdb_id=tpdbid, q=q,
             source_type="torrent", limit=limit, offset=offset,
