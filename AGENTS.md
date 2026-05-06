@@ -112,6 +112,12 @@ python main.py all                  # everything in one process (dev only)
 All services share the same PostgreSQL. Disabling a service = remove or comment its
 block in `docker-compose.yml`. No code changes required.
 
+For tesing, use .venv:
+```
+.venv/bin/pip install package --quiet
+.venv/bin/python3 script.py
+```
+
 **Migrations:** migrate.py must run after the postgress database and before all other services in the docker compose. With depends_on and condition: service_completed_successfully.
 
 ## Key design rules
