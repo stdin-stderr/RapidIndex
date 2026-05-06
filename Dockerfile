@@ -6,7 +6,7 @@ RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml .
 COPY src/ src/
-COPY migrate.py .
+COPY *.py .
 
 RUN uv pip install --system --no-cache .
 

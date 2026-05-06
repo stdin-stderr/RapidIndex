@@ -16,7 +16,6 @@ class Settings(BaseSettings):
     xxxclub_page_concurrency: int = 3
 
     # Spotnet ingester
-    spotnet_enabled: bool = False
     spotnet_nntp_host: str | None = None
     spotnet_nntp_port: int = 563
     spotnet_nntp_user: str | None = None

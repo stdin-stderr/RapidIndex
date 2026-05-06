@@ -112,9 +112,7 @@ python main.py all                  # everything in one process (dev only)
 All services share the same PostgreSQL. Disabling a service = remove or comment its
 block in `docker-compose.yml`. No code changes required.
 
-**Migrations:** every service mode runs the migration check at startup. A PostgreSQL
-advisory lock ensures only the first container to connect actually executes the migration.
-All others wait and proceed once the schema is ready.
+**Migrations:** migrate.py must run after the postgress database and before all other services in the docker compose. With depends_on and condition: service_completed_successfully.
 
 ## Key design rules
 
