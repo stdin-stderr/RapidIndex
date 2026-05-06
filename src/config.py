@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Spotnet ingester
     spotnet_nntp_host: str | None = None
     spotnet_nntp_port: int = 563
+    spotnet_nntp_ssl: bool = True
     spotnet_nntp_user: str | None = None
     spotnet_nntp_pass: str | None = None
     spotnet_newsgroups: str = "free.pt"
