@@ -17,9 +17,10 @@ _SPOTNET_MAP: dict[str, ContentCategory] = {
     "video:movies_hd": ContentCategory.MOVIE,
     "video:tv_hd": ContentCategory.TV,
     "xxx": ContentCategory.XXX,
-    "audio": ContentCategory.OTHER,
+    "audio": ContentCategory.MUSIC,
+    "book": ContentCategory.BOOK,
     "image": ContentCategory.OTHER,
-    "apps": ContentCategory.OTHER,
+    "apps": ContentCategory.SOFTWARE,
 }
 
 

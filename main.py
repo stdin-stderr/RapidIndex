@@ -67,8 +67,14 @@ def main() -> None:
     elif mode == "worker":
         asyncio.run(run_worker_mode())
 
-    elif mode in ("api", "all"):
-        log.error("Mode '%s' not yet implemented", mode)
+    elif mode == "api":
+        import uvicorn
+        from src.api.app import app
+        from src.config import settings
+        uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_level="info")
+
+    elif mode == "all":
+        log.error("Mode 'all' not yet implemented", )
         sys.exit(1)
 
     else:

@@ -19,7 +19,12 @@ _HINT_MAP: dict[str, EnricherType] = {
     "xxx":   EnricherType.TPDB,
 }
 
-_SKIP_RAW = {"audio", "image", "apps"}
+_SKIP_CONTENT_TYPES = {
+    ContentCategory.MUSIC,
+    ContentCategory.BOOK,
+    ContentCategory.SOFTWARE,
+    ContentCategory.OTHER,
+}
 
 
 def route(release: Release, settings: Settings) -> tuple[EnricherType, ParsedTitle]:
@@ -46,17 +51,15 @@ def _pick_enricher(release: Release, parsed: ParsedTitle) -> EnricherType:
     if release.source_name == "xxxclub":
         return EnricherType.TPDB
 
-    # Priority 4 — non-video categories → skip enrichment
-    if raw_cat in _SKIP_RAW:
-        return EnricherType.SKIP
-
-    # Priority 5/6 — normalised category
+    # Priority 4/5/6 — normalised category
     if raw_cat:
         cat = normalise_category(release.source_name, raw_cat)
         if cat == ContentCategory.MOVIE:
             return EnricherType.TMDB_MOVIE
         if cat == ContentCategory.TV:
             return EnricherType.TMDB_TV
+        if cat in _SKIP_CONTENT_TYPES:
+            return EnricherType.SKIP
         # ContentCategory.VIDEO falls through to parser-based detection below
 
     # Priority 7 — parser detected a season number → TV

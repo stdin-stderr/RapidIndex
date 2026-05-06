@@ -192,6 +192,8 @@ def _raw_category(spotnet_category: int | None, subcats: list[str]) -> str:
     if spotnet_category == 0:
         if "z3" in subcats:   # Erotica
             return "xxx"
+        if "z2" in subcats:   # Book
+            return "book"
         if "z1" in subcats:   # Series
             return "video:tv_hd"
         return "video:movies_hd"  # z0=Movie or unknown

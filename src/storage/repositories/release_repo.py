@@ -5,8 +5,9 @@ from uuid import UUID
 from sqlalchemy import delete, exists, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from src.storage.models import PendingEnrichment, Release, TorrentRelease, UsenetRelease
+from src.storage.models import PendingEnrichment, Release, ReleaseTmdbTitle, TmdbMetadata, TorrentRelease, UsenetRelease
 
 
 async def upsert_release(
@@ -125,6 +126,7 @@ async def search_releases(
     content_type: Optional[str] = None,
     quality: Optional[str] = None,
     source_type: Optional[str] = None,
+    metadata_status: Optional[str] = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[Release]:
@@ -135,6 +137,107 @@ async def search_releases(
         stmt = stmt.where(Release.content_type == content_type)
     if quality:
         stmt = stmt.where(Release.quality == quality)
+    if source_type:
+        stmt = stmt.where(Release.source_type == source_type)
+    if metadata_status:
+        stmt = stmt.where(Release.metadata_status == metadata_status)
+    stmt = stmt.order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def search_tmdb_matched_releases(
+    session: AsyncSession,
+    *,
+    q: Optional[str] = None,
+    content_type: str,
+    source_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Release]:
+    stmt = (
+        select(Release)
+        .join(ReleaseTmdbTitle, ReleaseTmdbTitle.release_id == Release.id)
+        .join(TmdbMetadata, TmdbMetadata.tmdb_id == ReleaseTmdbTitle.tmdb_id)
+        .where(Release.content_type == content_type)
+        .where(TmdbMetadata.tmdb_type == content_type)
+    )
+    if q:
+        stmt = stmt.where(Release.raw_title.ilike(f"%{q}%"))
+    if source_type:
+        stmt = stmt.where(Release.source_type == source_type)
+    stmt = stmt.distinct().order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_releases_by_imdb_id(
+    session: AsyncSession,
+    imdb_id: str,
+    *,
+    source_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Release]:
+    stmt = (
+        select(Release)
+        .join(ReleaseTmdbTitle, ReleaseTmdbTitle.release_id == Release.id)
+        .join(TmdbMetadata, TmdbMetadata.tmdb_id == ReleaseTmdbTitle.tmdb_id)
+        .where(TmdbMetadata.imdb_id == imdb_id)
+    )
+    if source_type:
+        stmt = stmt.where(Release.source_type == source_type)
+    stmt = stmt.order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_releases_by_tmdb_id(
+    session: AsyncSession,
+    tmdb_id: int,
+    *,
+    season: Optional[int] = None,
+    episode: Optional[int] = None,
+    source_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Release]:
+    stmt = (
+        select(Release)
+        .join(ReleaseTmdbTitle, ReleaseTmdbTitle.release_id == Release.id)
+        .where(ReleaseTmdbTitle.tmdb_id == tmdb_id)
+    )
+    if season is not None:
+        stmt = stmt.where(Release.season == season)
+    if episode is not None:
+        stmt = stmt.where(Release.episode == episode)
+    if source_type:
+        stmt = stmt.where(Release.source_type == source_type)
+    stmt = stmt.order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_releases_by_tvdb_id(
+    session: AsyncSession,
+    tvdb_id: int,
+    *,
+    season: Optional[int] = None,
+    episode: Optional[int] = None,
+    source_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Release]:
+    stmt = (
+        select(Release)
+        .join(ReleaseTmdbTitle, ReleaseTmdbTitle.release_id == Release.id)
+        .join(TmdbMetadata, TmdbMetadata.tmdb_id == ReleaseTmdbTitle.tmdb_id)
+        .where(TmdbMetadata.tvdb_id == tvdb_id)
+    )
+    if season is not None:
+        stmt = stmt.where(Release.season == season)
+    if episode is not None:
+        stmt = stmt.where(Release.episode == episode)
     if source_type:
         stmt = stmt.where(Release.source_type == source_type)
     stmt = stmt.order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
