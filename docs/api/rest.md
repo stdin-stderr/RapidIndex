@@ -25,6 +25,38 @@ Returns releases with their enrichment status. Does not inline metadata — clie
 
 ---
 
+## File Metadata
+
+```
+GET /api/v1/releases/:release_id/files
+```
+
+Returns the file list for a release (NZB or torrent). Each file includes:
+- `file_index` (0-based) — use for debrid API integration
+- `filename`
+- `file_size_bytes`
+
+Response:
+```json
+{
+  "release_id": "uuid",
+  "source_type": "usenet|torrent",
+  "file_count": 5,
+  "files": [
+    {
+      "file_index": 0,
+      "filename": "Release.Title.S01E01.mkv",
+      "file_size_bytes": 4294967296
+    },
+    ...
+  ]
+}
+```
+
+Used by Stremio addon to map file indices to filenames for per-file debrid resolution.
+
+---
+
 ## TMDB Titles
 
 ```

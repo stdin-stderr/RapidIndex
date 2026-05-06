@@ -39,10 +39,20 @@ One `asyncio` task per configured ingester. Runs only in `ingester` process mode
 **Per interval:**
 1. Call `ingester.fetch_new()` — yields `RawRelease` objects.
 2. For each release: upsert into `releases` + source side-table by `source_key`.
-3. For new releases only: insert into `pending_enrichment`.
-4. Update `scan_state` watermark after the full batch completes successfully.
+3. If `RawRelease.files` is present: extract and insert file metadata:
+   - For usenet: insert into `usenet_files` with filename, size, segment IDs, file index
+   - For torrent: insert into `torrent_files` with filename, size, file index
+4. For new releases only: insert into `pending_enrichment`.
+5. Update `scan_state` watermark after the full batch completes successfully.
 
 The scheduler does not call the content router or any enricher — it only writes raw data and queues work.
+
+### File extraction
+
+Files are extracted at index time (not lazily at API query time) to enable:
+- Per-file search/filtering (`usenet_files`, `torrent_files` indexes)
+- Stremio debrid resolution (file_index → filename mapping)
+- Re-indexing refreshes file lists (idempotent: old files are deleted before new ones inserted)
 
 ---
 

@@ -28,10 +28,14 @@ class RawRelease:
     # Usenet-only
     newsgroup: str | None
     nzb_segments: str | None    # pipe-delimited NNTP message-IDs: "<a@n>|<b@n>|"
+    nzb_xml: bytes | None       # assembled NZB blob (Spotnet only)
     poster: str | None
 
     # Optional enrichment hints (ingester sets only what it can reliably extract)
     hints: dict[str, str] | None = None
+
+    # File metadata (extracted from NZB or torrent at ingestion time)
+    files: list[dict] | None = None  # [{"filename": str, "file_size_bytes": int, "file_index": int, ...}]
 ```
 
 ### Hint keys

@@ -31,6 +31,9 @@ class RawRelease:
     # Optional enrichment hints (written once; never overwritten on re-upsert)
     hints: dict[str, str] | None = None
 
+    # File metadata (extracted from NZB or torrent at ingestion time)
+    files: list[dict[str, int | str | list[str]]] | None = None
+
 
 class Ingester(ABC):
     @abstractmethod

@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.storage.models import PendingEnrichment, Release, ReleaseTmdbTitle, ReleaseTpdbScene, TmdbMetadata, TorrentRelease, TpdbScene, UsenetRelease
+from src.storage.models import PendingEnrichment, Release, ReleaseTmdbTitle, ReleaseTpdbScene, TmdbMetadata, TorrentFile, TorrentRelease, TpdbScene, UsenetFile, UsenetRelease
 
 
 async def upsert_release(
@@ -37,6 +37,8 @@ async def upsert_release(
     magnet_uri: Optional[str] = None,
     seeders: Optional[int] = None,
     leechers: Optional[int] = None,
+    # File metadata
+    files: Optional[list[dict]] = None,
 ) -> Release:
     stmt = (
         insert(Release)
@@ -95,6 +97,36 @@ async def upsert_release(
             )
         )
         await session.execute(side)
+
+    # Insert file metadata
+    if files:
+        if source_type == "usenet":
+            # Delete existing files for this release (idempotent re-index)
+            await session.execute(delete(UsenetFile).where(UsenetFile.release_id == release.id))
+            # Insert new files
+            for f in files:
+                await session.execute(
+                    insert(UsenetFile).values(
+                        release_id=release.id,
+                        filename=f.get("filename"),
+                        file_size_bytes=f.get("file_size_bytes", 0),
+                        file_index=f.get("file_index", 0),
+                        segment_ids=f.get("segment_ids", []),
+                    )
+                )
+        elif source_type == "torrent":
+            # Delete existing files for this release (idempotent re-index)
+            await session.execute(delete(TorrentFile).where(TorrentFile.release_id == release.id))
+            # Insert new files
+            for f in files:
+                await session.execute(
+                    insert(TorrentFile).values(
+                        release_id=release.id,
+                        filename=f.get("filename"),
+                        file_size_bytes=f.get("file_size_bytes", 0),
+                        file_index=f.get("file_index", 0),
+                    )
+                )
 
     if metadata_status == "pending":
         already_queued = await session.scalar(

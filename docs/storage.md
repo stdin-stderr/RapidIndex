@@ -94,6 +94,39 @@ torrent_releases
 
 ---
 
+### `usenet_files`
+Per-file metadata extracted from NZB releases at ingestion time.
+
+```
+usenet_files
+  id                uuid PK default gen_random_uuid()
+  release_id        uuid FK → releases.id
+  filename          text NOT NULL
+  file_size_bytes   bigint NOT NULL
+  file_index        int NOT NULL  -- 0-based index in NZB for debrid API
+  segment_ids       text[] NOT NULL -- NNTP message-IDs for this file
+  created_at        timestamptz default now()
+  UNIQUE (release_id, filename)
+```
+
+---
+
+### `torrent_files`
+Per-file metadata extracted from torrent releases at ingestion time.
+
+```
+torrent_files
+  id                uuid PK default gen_random_uuid()
+  release_id        uuid FK → releases.id
+  filename          text NOT NULL
+  file_size_bytes   bigint NOT NULL
+  file_index        int NOT NULL  -- 0-based index for debrid API
+  created_at        timestamptz default now()
+  UNIQUE (release_id, file_index)
+```
+
+---
+
 ### `pending_enrichment`
 PostgreSQL-backed work queue. See [pipeline.md](pipeline.md).
 

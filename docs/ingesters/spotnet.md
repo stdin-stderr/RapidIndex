@@ -70,6 +70,19 @@ NNTP credentials. See [nzb.md](../nzb.md).
 
 ---
 
+## File extraction
+
+After NZB assembly, the ingester parses the NZB XML to extract individual file metadata:
+
+- Filename
+- Per-file size (sum of segment sizes)
+- NNTP segment message-IDs
+- 0-based file index (for debrid API resolution)
+
+This metadata is stored in `usenet_files` and exposed via the `/api/v1/releases/{id}/files` endpoint.
+
+---
+
 ## Notes
 
 - Lazy NNTP reconnection with exponential backoff on connection loss

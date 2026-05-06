@@ -57,6 +57,7 @@ async def _process_release(session_factory, raw: RawRelease) -> None:
             magnet_uri=raw.magnet_uri,
             seeders=raw.seeders,
             leechers=raw.leechers,
+            files=raw.files,
         )
 
 

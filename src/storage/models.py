@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import DateTime
 
@@ -73,6 +73,12 @@ class Release(Base):
         back_populates="release"
     )
     tpdb_scenes: Mapped[list["ReleaseTpdbScene"]] = relationship(
+        back_populates="release"
+    )
+    usenet_files: Mapped[list["UsenetFile"]] = relationship(
+        back_populates="release"
+    )
+    torrent_files: Mapped[list["TorrentFile"]] = relationship(
         back_populates="release"
     )
 
@@ -250,6 +256,53 @@ class ReleaseTpdbScene(Base):
 
     release: Mapped["Release"] = relationship(back_populates="tpdb_scenes")
     scene: Mapped["TpdbScene"] = relationship(back_populates="releases")
+
+
+class UsenetFile(Base):
+    __tablename__ = "usenet_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    release_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("releases.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(Text, nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    segment_ids: Mapped[list[str]] = mapped_column(ARRAY(String), nullable=False)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+    __table_args__ = (
+        UniqueConstraint("release_id", "filename", name="uq_usenet_files_release_filename"),
+    )
+
+    release: Mapped["Release"] = relationship(back_populates="usenet_files")
+
+
+class TorrentFile(Base):
+    __tablename__ = "torrent_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    release_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("releases.id", ondelete="CASCADE"), nullable=False
+    )
+    filename: Mapped[str] = mapped_column(Text, nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    file_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+    __table_args__ = (
+        UniqueConstraint("release_id", "file_index", name="uq_torrent_files_release_index"),
+    )
+
+    release: Mapped["Release"] = relationship(back_populates="torrent_files")
 
 
 class TpdbPerformer(Base):

@@ -24,6 +24,7 @@ from src.config import Settings
 from src.ingesters.base import Ingester, RawRelease
 from src.ingesters.usenet.nntp import NNTPClient
 from src.nzb.builder import build_nzb
+from src.nzb.extractor import extract_files_from_nzb
 from src.storage.repositories.scan_state_repo import get_watermark, set_watermark
 
 log = logging.getLogger(__name__)
@@ -356,6 +357,7 @@ class SpotnetIngester(Ingester):
                     continue
 
                 nzb_xml: bytes | None = None
+                files: list[dict[str, int | str | list[str]]] | None = None
                 if post.nzb_segments:
                     try:
                         nzb_xml = await build_nzb(post.nzb_segments, nntp)
@@ -364,6 +366,18 @@ class SpotnetIngester(Ingester):
                                 "Spotnet %s: NZB assembled (%d bytes) for %r",
                                 group_name, len(nzb_xml), post.title,
                             )
+                            # Extract files from NZB XML
+                            file_list = extract_files_from_nzb(nzb_xml)
+                            if file_list:
+                                files = [
+                                    {
+                                        "filename": f["filename"],
+                                        "file_size_bytes": f["file_size_bytes"],
+                                        "segment_ids": f["segment_ids"],
+                                        "file_index": f["file_index"],
+                                    }
+                                    for f in file_list
+                                ]
                     except Exception as exc:
                         log.warning(
                             "Spotnet %s: NZB assembly failed for %r: %s",
@@ -388,6 +402,7 @@ class SpotnetIngester(Ingester):
                     nzb_segments="|".join(post.nzb_segments) if post.nzb_segments else None,
                     nzb_xml=nzb_xml,
                     poster=post.poster or None,
+                    files=files,
                 )
                 stored += 1
 
