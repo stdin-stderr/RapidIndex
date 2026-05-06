@@ -54,6 +54,17 @@ class _SpotnetPost:
 # Spotnet XML parser (ported from py_spotweb/src/scanner/spotnet.py)
 # ---------------------------------------------------------------------------
 
+def _parse_subcat_elements(elements) -> list[str]:
+    """Extract subcat codes from an iterable of XML elements matching _SUBCAT_RE."""
+    codes: list[str] = []
+    for el in elements:
+        if el.text and el.text.strip():
+            m = _SUBCAT_RE.search(el.text.strip())
+            if m:
+                codes.append(m.group(2).lower() + str(int(m.group(3))))
+    return codes
+
+
 def _parse_spotnet_body(lines: list[bytes]) -> _SpotnetPost | None:
     """Parse raw NNTP article lines (headers + body) into a _SpotnetPost.
 
@@ -131,18 +142,7 @@ def _parse_spotnet_body(lines: list[bytes]) -> _SpotnetPost | None:
         spotnet_category = None
 
     # Parse sub-category codes — wire format: <Sub>01a09</Sub> → "a9"
-    subcat_codes: list[str] = []
-    for el in posting.iter("Sub"):
-        if el.text and el.text.strip():
-            m = _SUBCAT_RE.search(el.text.strip())
-            if m:
-                subcat_codes.append(m.group(2).lower() + str(int(m.group(3))))
-    if not subcat_codes:
-        for el in posting.iter("SubCat"):
-            if el.text and el.text.strip():
-                m = _SUBCAT_RE.search(el.text.strip())
-                if m:
-                    subcat_codes.append(m.group(2).lower() + str(int(m.group(3))))
+    subcat_codes = _parse_subcat_elements(posting.iter("Sub")) or _parse_subcat_elements(posting.iter("SubCat"))
 
     # Auto-generate z-subcat for video posts that lack one
     if spotnet_category == 0 and not any(c.startswith("z") for c in subcat_codes):

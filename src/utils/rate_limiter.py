@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 
 class RateLimiter:
@@ -8,13 +9,13 @@ class RateLimiter:
         self._rate = rate
         self._per_seconds = per_seconds
         self._tokens: float = rate
-        self._last_refill: float = asyncio.get_event_loop().time()
+        self._last_refill: float = time.monotonic()
         self._lock = asyncio.Lock()
 
     async def acquire(self) -> None:
         """Block until a token is available, then consume it."""
         async with self._lock:
-            now = asyncio.get_event_loop().time()
+            now = time.monotonic()
             elapsed = now - self._last_refill
             self._tokens = min(
                 self._rate,

@@ -63,7 +63,7 @@ async def upsert_release(
             index_elements=["source_key"],
             set_={
                 # Only mutable fields — hints is intentionally excluded (written once).
-                "updated_at": datetime.utcnow(),
+                "updated_at": datetime.now(timezone.utc),
             },
         )
         .returning(Release)

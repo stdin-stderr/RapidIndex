@@ -12,6 +12,7 @@ import asyncio
 import logging
 
 from src.ingesters.base import Ingester, RawRelease
+from src.routing.content_router import EnricherType
 from src.storage.repositories.release_repo import upsert_release
 from src.utils.categories import ContentCategory, extract_quality, normalise_category, should_skip_enrichment
 
@@ -20,22 +21,22 @@ log = logging.getLogger(__name__)
 
 def _enricher_for(ct: ContentCategory) -> str:
     if ct == ContentCategory.XXX:
-        return "tpdb"
+        return EnricherType.TPDB.value
     if ct == ContentCategory.TV:
-        return "tmdb_tv"
+        return EnricherType.TMDB_TV.value
     if ct in (ContentCategory.MOVIE, ContentCategory.VIDEO):
-        return "tmdb_movie"
-    return "skip"
+        return EnricherType.TMDB_MOVIE.value
+    return EnricherType.SKIP.value
 
 
 async def _process_release(session_factory, raw: RawRelease) -> None:
     content_type = normalise_category(raw.source_name, raw.raw_category or "")
-    enricher = _enricher_for(content_type)
-    metadata_status = "pending" if enricher != "skip" else "skipped"
-
     if should_skip_enrichment(raw.source_name, raw.raw_category or ""):
-        enricher = "skip"
+        enricher = EnricherType.SKIP.value
         metadata_status = "skipped"
+    else:
+        enricher = _enricher_for(content_type)
+        metadata_status = "pending" if enricher != EnricherType.SKIP.value else "skipped"
 
     quality = extract_quality(raw.source_name, raw.raw_category or "")
 

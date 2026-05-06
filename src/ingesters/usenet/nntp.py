@@ -121,7 +121,8 @@ class NNTPClient:
     # ------------------------------------------------------------------
 
     def _send(self, cmd: str) -> None:
-        assert self._sock is not None
+        if self._sock is None:
+            raise NNTPError("Not connected")
         self._sock.sendall((cmd + "\r\n").encode("utf-8"))
 
     def _readline(self) -> bytes:

@@ -32,11 +32,6 @@ def get_session_factory():
     return _session_factory
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    async with get_session_factory()() as session:
-        yield session
-
-
 async def run_migrations() -> None:
     from alembic import command
     from alembic.config import Config

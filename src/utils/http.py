@@ -50,7 +50,7 @@ class HttpClient:
             if cached is not None:
                 return json.loads(cached)
 
-        data = await self._request("GET", url, **kwargs)
+        data = await self._do_request("GET", url, as_text=False, **kwargs)
 
         if redis is not None:
             await redis.set(url, json.dumps(data), ex=ttl)
@@ -58,6 +58,13 @@ class HttpClient:
         return data
 
     async def _request(self, method: str, url: str, **kwargs) -> dict:
+        return await self._do_request(method, url, as_text=False, **kwargs)
+
+    async def fetch_text(self, url: str, **kwargs) -> str:
+        """GET url, returning raw text. No caching."""
+        return await self._do_request("GET", url, as_text=True, **kwargs)
+
+    async def _do_request(self, method: str, url: str, *, as_text: bool, **kwargs):
         session = self._get_session()
         backoff = _BASE_BACKOFF
 
@@ -80,44 +87,7 @@ class HttpClient:
                         continue
 
                     resp.raise_for_status()
-                    return await resp.json()
-
-            except aiohttp.ClientResponseError:
-                raise
-            except aiohttp.ClientError as exc:
-                if attempt == _MAX_RETRIES:
-                    raise
-                logger.debug("Client error on %s (attempt %d): %s", url, attempt, exc)
-                await asyncio.sleep(backoff)
-                backoff = min(backoff * 2, 60)
-
-        raise RuntimeError(f"Exhausted retries for {url}")  # unreachable
-
-    async def fetch_text(self, url: str, **kwargs) -> str:
-        """GET url, returning raw text. No caching."""
-        session = self._get_session()
-        backoff = _BASE_BACKOFF
-
-        for attempt in range(1, _MAX_RETRIES + 1):
-            try:
-                async with session.get(url, **kwargs) as resp:
-                    if resp.status == 429:
-                        retry_after = float(resp.headers.get("Retry-After", backoff))
-                        logger.debug("429 from %s, waiting %.1fs", url, retry_after)
-                        await asyncio.sleep(retry_after)
-                        backoff = min(backoff * 2, 60)
-                        continue
-
-                    if resp.status >= 500:
-                        if attempt == _MAX_RETRIES:
-                            resp.raise_for_status()
-                        logger.debug("5xx from %s (attempt %d), backing off %.1fs", url, attempt, backoff)
-                        await asyncio.sleep(backoff)
-                        backoff = min(backoff * 2, 60)
-                        continue
-
-                    resp.raise_for_status()
-                    return await resp.text()
+                    return await resp.text() if as_text else await resp.json()
 
             except aiohttp.ClientResponseError:
                 raise

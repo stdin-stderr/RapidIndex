@@ -1,9 +1,11 @@
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import Text, cast as sa_cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_session
+from src.storage.models import TpdbScene
 from src.storage.repositories.scene_repo import search_scenes
 
 router = APIRouter()
@@ -50,11 +52,6 @@ async def list_tpdb_movies(
     per_page: int = Query(30, ge=1, le=250),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
-    from sqlalchemy import select
-    from src.storage.models import TpdbScene
-    from sqlalchemy.ext.asyncio import AsyncSession as _S
-    from sqlalchemy import Text, cast as sa_cast
-
     stmt = select(TpdbScene).where(TpdbScene.tpdb_type == "movie")
     if q:
         stmt = stmt.where(TpdbScene.title.ilike(f"%{q}%"))

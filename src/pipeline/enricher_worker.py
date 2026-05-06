@@ -55,6 +55,16 @@ def _build_enrichers(settings: Settings, enricher_filter: str) -> dict[EnricherT
     return enrichers
 
 
+async def _update_release_parsed_fields(session, release_id, parsed, now, **extra) -> None:
+    """Write parsed title fields back to the release row and commit."""
+    await session.execute(
+        update(Release)
+        .where(Release.id == release_id)
+        .values(quality=parsed.resolution, date=parsed.release_date, updated_at=now, **extra)
+    )
+    await session.commit()
+
+
 async def _write_tmdb_match(session, release_id, metadata: dict, parsed) -> None:
     """Upsert TmdbMetadata, link join row, write cast if new."""
     now = datetime.now(timezone.utc)
@@ -100,19 +110,10 @@ async def _write_tmdb_match(session, release_id, metadata: dict, parsed) -> None
                 cast_order=member.get("cast_order", 0),
             )
 
-    # Write back parsed fields to the release row.
-    await session.execute(
-        update(Release)
-        .where(Release.id == release_id)
-        .values(
-            season=parsed.season,
-            episode=parsed.episode,
-            quality=parsed.resolution,
-            date=parsed.release_date,
-            updated_at=now,
-        )
+    await _update_release_parsed_fields(
+        session, release_id, parsed, now,
+        season=parsed.season, episode=parsed.episode,
     )
-    await session.commit()
 
 
 async def _write_tpdb_match(session, release_id, metadata: dict, parsed) -> None:
@@ -175,13 +176,7 @@ async def _write_tpdb_match(session, release_id, metadata: dict, parsed) -> None
         if profile.get("id"):
             await upsert_performer(session, {**profile, "fetched_at": now})
 
-    # 6. Write back parsed fields to the release row
-    await session.execute(
-        update(Release)
-        .where(Release.id == release_id)
-        .values(quality=parsed.resolution, date=parsed.release_date, updated_at=now)
-    )
-    await session.commit()
+    await _update_release_parsed_fields(session, release_id, parsed, now)
 
 
 async def _mark_skipped(session, pending_id: int, release_id) -> None:

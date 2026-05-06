@@ -54,6 +54,16 @@ def _get_li_value(soup: BeautifulSoup, label: str) -> str | None:
     return None
 
 
+def _get_li_anchor_text(soup: BeautifulSoup, label: str) -> str | None:
+    """Find the <li> whose first <span> matches label and return the link text."""
+    for li in soup.select("div.detailsdescr li"):
+        spans = li.find_all("span", recursive=False)
+        if spans and spans[0].get_text(strip=True) == label:
+            a = li.find("a")
+            return a.get_text(strip=True) if a else None
+    return None
+
+
 def _parse_detail_page(torrent_id: int, html: str) -> RawRelease | None:
     soup = BeautifulSoup(html, "lxml")
 
@@ -67,13 +77,7 @@ def _parse_detail_page(torrent_id: int, html: str) -> RawRelease | None:
         return None
 
     # Category
-    raw_category: str | None = None
-    for li in details.select("div.detailsdescr li"):
-        spans = li.find_all("span", recursive=False)
-        if spans and spans[0].get_text(strip=True) == "Category":
-            a = li.find("a")
-            raw_category = a.get_text(strip=True) if a else None
-            break
+    raw_category = _get_li_anchor_text(details, "Category")
 
     # Size
     size_str = _get_li_value(soup, "Size")
@@ -140,13 +144,7 @@ def _parse_detail_page(torrent_id: int, html: str) -> RawRelease | None:
     # Hints
     uploader = _get_li_value(soup, "Uploader")
     downloads = _get_li_value(soup, "Downloads")
-    collection_tag = None
-    for li in details.select("div.detailsdescr li"):
-        spans = li.find_all("span", recursive=False)
-        if spans and spans[0].get_text(strip=True) == "Collection":
-            a = li.find("a")
-            collection_tag = a.get_text(strip=True) if a else None
-            break
+    collection_tag = _get_li_anchor_text(details, "Collection")
 
     poster_tag = details.find("img", class_="detailsposter")
     poster_url = poster_tag["src"] if poster_tag else None

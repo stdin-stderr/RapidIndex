@@ -81,7 +81,7 @@ def main() -> None:
         uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_level="info")
 
     elif mode == "all":
-        log.error("Mode 'all' not yet implemented", )
+        log.error("Mode 'all' not yet implemented")
         sys.exit(1)
 
     else:
