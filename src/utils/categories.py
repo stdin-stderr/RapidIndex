@@ -24,6 +24,29 @@ _SPOTNET_MAP: dict[str, ContentCategory] = {
 }
 
 
+# xxxclub categories that have no TPDB scene data — skip enrichment
+_XXXCLUB_SKIP: frozenset[str] = frozenset({"Movies/DVD/WEB", "IMAGESET"})
+
+_XXXCLUB_QUALITY: dict[str, str] = {
+    "480p/SD": "SD",
+    "720p/HD": "HD",
+    "1080p/FullHD": "FHD",
+    "2160p/UHD/4K": "UHD",
+}
+
+
+def should_skip_enrichment(source: str, raw: str) -> bool:
+    """Return True if this release should not be sent to an enricher."""
+    return source == "xxxclub" and raw in _XXXCLUB_SKIP
+
+
+def extract_quality(source: str, raw: str) -> str | None:
+    """Return a normalised quality string for sources that encode it in the category."""
+    if source == "xxxclub":
+        return _XXXCLUB_QUALITY.get(raw)
+    return None
+
+
 def normalise_category(source: str, raw: str) -> ContentCategory:
     """Map a source-specific raw category string to a ContentCategory.
 

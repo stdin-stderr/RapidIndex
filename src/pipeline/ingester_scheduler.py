@@ -13,7 +13,7 @@ import logging
 
 from src.ingesters.base import Ingester, RawRelease
 from src.storage.repositories.release_repo import upsert_release
-from src.utils.categories import ContentCategory, normalise_category
+from src.utils.categories import ContentCategory, extract_quality, normalise_category, should_skip_enrichment
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +33,12 @@ async def _process_release(session_factory, raw: RawRelease) -> None:
     enricher = _enricher_for(content_type)
     metadata_status = "pending" if enricher != "skip" else "skipped"
 
+    if should_skip_enrichment(raw.source_name, raw.raw_category or ""):
+        enricher = "skip"
+        metadata_status = "skipped"
+
+    quality = extract_quality(raw.source_name, raw.raw_category or "")
+
     async with session_factory() as session:
         await upsert_release(
             session,
@@ -43,7 +49,7 @@ async def _process_release(session_factory, raw: RawRelease) -> None:
             raw_category=raw.raw_category,
             file_size_bytes=raw.file_size_bytes,
             published_at=raw.published_at,
-            quality=None,
+            quality=quality,
             content_type=str(content_type),
             season=None,
             episode=None,
