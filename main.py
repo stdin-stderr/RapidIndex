@@ -26,6 +26,13 @@ def _session_factory():
     return get_session_factory()
 
 
+async def run_worker_mode() -> None:
+    from src.config import settings
+    from src.pipeline.enricher_worker import run_workers
+    log.info("Starting enricher worker")
+    await run_workers(_session_factory(), settings)
+
+
 async def run_ingester(name: str) -> None:
     from src.config import settings
     from src.pipeline.ingester_scheduler import run_ingesters
@@ -57,7 +64,10 @@ def main() -> None:
             sys.exit(1)
         asyncio.run(run_ingester(sys.argv[2]))
 
-    elif mode in ("api", "worker", "all"):
+    elif mode == "worker":
+        asyncio.run(run_worker_mode())
+
+    elif mode in ("api", "all"):
         log.error("Mode '%s' not yet implemented", mode)
         sys.exit(1)
 

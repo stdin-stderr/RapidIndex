@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -143,22 +143,37 @@ async def search_releases(
 
 
 async def claim_enrichment_batch(
-    session: AsyncSession, batch_size: int = 10
+    session: AsyncSession, batch_size: int = 10, lease_minutes: int = 5
 ) -> list[PendingEnrichment]:
-    # FOR UPDATE SKIP LOCKED — safe for multiple concurrent worker containers.
-    subq = (
+    """Atomically claim a batch and stamp a lease so other workers skip them.
+
+    Uses a CTE with FOR UPDATE SKIP LOCKED to select candidates, then
+    immediately updates next_attempt to now+lease so the rows are invisible
+    to concurrent workers even after this session commits.
+    """
+    now = datetime.now(timezone.utc)
+    lease_until = now + timedelta(minutes=lease_minutes)
+
+    cte = (
         select(PendingEnrichment.id)
         .where(
             (PendingEnrichment.next_attempt == None)  # noqa: E711
-            | (PendingEnrichment.next_attempt <= datetime.utcnow())
+            | (PendingEnrichment.next_attempt <= now)
         )
         .limit(batch_size)
         .with_for_update(skip_locked=True)
-        .subquery()
+        .cte("claimed")
     )
-    stmt = select(PendingEnrichment).where(PendingEnrichment.id.in_(select(subq)))
+    stmt = (
+        update(PendingEnrichment)
+        .where(PendingEnrichment.id.in_(select(cte.c.id)))
+        .values(next_attempt=lease_until)
+        .returning(PendingEnrichment)
+    )
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    items = list(result.scalars().all())
+    await session.commit()
+    return items
 
 
 async def complete_enrichment(
@@ -177,7 +192,7 @@ async def complete_enrichment(
             metadata_status="matched",
             metadata_score=score,
             matched_at=matched_at,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(timezone.utc),
         )
     )
     await session.execute(
@@ -201,7 +216,7 @@ async def fail_enrichment(
         await session.execute(
             update(Release)
             .where(Release.id == release_id)
-            .values(metadata_status="match_failed", updated_at=datetime.utcnow())
+            .values(metadata_status="match_failed", updated_at=datetime.now(timezone.utc))
         )
         await session.delete(row)
     else:

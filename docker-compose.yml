@@ -25,13 +25,13 @@ services:
         condition: service_healthy
     restart: "no"
 
-  test-spotnet:
-    build: .
-    command: python test_spotnet.py
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
+  # test-spotnet:
+  #   build: .
+  #   command: python test_spotnet.py
+  #   env_file: .env
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
 
   # api:
   #   build: .
@@ -43,13 +43,13 @@ services:
   #     migrate:
   #       condition: service_completed_successfully
 
-  # worker:
-  #   build: .
-  #   command: python main.py worker
-  #   env_file: .env
-  #   depends_on:
-  #     migrate:
-  #       condition: service_completed_successfully
+  worker:
+    build: .
+    command: python main.py worker
+    env_file: .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   ingester-spotnet:
     build: .
