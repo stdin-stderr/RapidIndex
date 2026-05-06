@@ -16,10 +16,7 @@ from src.api.xml_builder import (
 from src.config import settings
 from src.storage.models import UsenetRelease
 from src.storage.repositories.release_repo import (
-    get_releases_by_imdb_id,
-    get_releases_by_tmdb_id,
-    get_releases_by_tvdb_id,
-    search_tmdb_matched_releases,
+    query_tmdb_releases,
     search_releases,
 )
 
@@ -76,41 +73,18 @@ async def newznab(
         return await _feed(session, releases)
 
     if t in ("movie", "movie-search", "moviesearch"):
-        if tmdbid:
-            releases = await get_releases_by_tmdb_id(
-                session, tmdbid, source_type="usenet", limit=limit, offset=offset
-            )
-        elif imdbid:
-            releases = await get_releases_by_imdb_id(
-                session, imdbid, source_type="usenet", limit=limit, offset=offset
-            )
-        else:
-            releases = await search_tmdb_matched_releases(
-                session, q=q, content_type="movie",
-                source_type="usenet", limit=limit, offset=offset,
-            )
+        releases = await query_tmdb_releases(
+            session, tmdb_id=tmdbid, imdb_id=imdbid, q=q,
+            content_type="movie", source_type="usenet", limit=limit, offset=offset,
+        )
         return await _feed(session, releases)
 
     if t in ("tv", "tvsearch", "tv-search"):
-        if tvdbid:
-            releases = await get_releases_by_tvdb_id(
-                session, tvdbid, season=season, episode=ep,
-                source_type="usenet", limit=limit, offset=offset,
-            )
-        elif tmdbid:
-            releases = await get_releases_by_tmdb_id(
-                session, tmdbid, season=season, episode=ep,
-                source_type="usenet", limit=limit, offset=offset,
-            )
-        elif imdbid:
-            releases = await get_releases_by_imdb_id(
-                session, imdbid, source_type="usenet", limit=limit, offset=offset,
-            )
-        else:
-            releases = await search_tmdb_matched_releases(
-                session, q=q, content_type="tv",
-                source_type="usenet", limit=limit, offset=offset,
-            )
+        releases = await query_tmdb_releases(
+            session, tmdb_id=tmdbid, imdb_id=imdbid, tvdb_id=tvdbid,
+            q=q, content_type="tv", season=season, episode=ep,
+            source_type="usenet", limit=limit, offset=offset,
+        )
         return await _feed(session, releases)
 
     return make_newznab_feed([], settings.api_base_url)
