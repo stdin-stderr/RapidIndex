@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import Response
 
-from src.api.feed import backdrop_url, cover_url, tmdb_for
+from src.api.feed import backdrop_url, cover_url, tmdb_for, tpdb_for
 
 if TYPE_CHECKING:
     from src.storage.models import Release
@@ -201,7 +201,10 @@ def _year_value(release: Release, metadata: Any) -> int | None:
 
 def _add_common_attrs(item: ET.Element, ns: str, r: Release, *, cat: int, size: str, guid: str) -> None:
     metadata = tmdb_for(r)
+    scene = tpdb_for(r)
     year = _year_value(r, metadata)
+    if year is None and scene and scene.date:
+        year = scene.date.year
 
     ET.SubElement(item, f"{{{ns}}}attr", name="category", value=str(cat))
     ET.SubElement(item, f"{{{ns}}}attr", name="size", value=size)
@@ -223,6 +226,18 @@ def _add_common_attrs(item: ET.Element, ns: str, r: Release, *, cat: int, size: 
             _add_attr(item, ns, "tvtitle", metadata.title)
             _add_attr(item, ns, "tvdbid", metadata.tvdb_id)
             _add_attr(item, ns, "tvmazeid", _external_id(metadata, "tvmaze_id"))
+
+    if scene:
+        _add_attr(item, ns, "tpdb", str(scene.id))
+        _add_attr(item, ns, "coverurl", scene.poster_url)
+        _add_attr(item, ns, "backdropurl", scene.background_url)
+        _add_attr(item, ns, "genre", _genre_value(scene.tags))
+        _add_attr(item, ns, "tpdbtitle", scene.title)
+        _add_attr(item, ns, "tpdbplot", scene.description)
+        if scene.site:
+            _add_attr(item, ns, "tpdbsite", scene.site.name)
+            if scene.site.network:
+                _add_attr(item, ns, "tpdbnetwork", scene.site.network.name)
 
     if r.season is not None:
         _add_attr(item, ns, "season", r.season)
@@ -324,6 +339,10 @@ def make_caps_response(is_torznab: bool = False) -> Response:
     ET.SubElement(
         searching, "movie-search", available="yes",
         supportedParams="q,imdbid,tmdbid,genre,year",
+    )
+    ET.SubElement(
+        searching, "adult-search", available="yes",
+        supportedParams="q,tpdbid",
     )
     categories = ET.SubElement(caps, "categories")
     for cat_id, cat_name, subcats in _CATEGORIES:

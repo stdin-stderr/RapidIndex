@@ -17,6 +17,7 @@ from src.config import settings
 from src.storage.models import UsenetRelease
 from src.storage.repositories.release_repo import (
     query_tmdb_releases,
+    query_tpdb_releases,
     search_releases,
 )
 
@@ -39,6 +40,7 @@ async def newznab(
     imdbid: Optional[str] = Query(None),
     tmdbid: Optional[int] = Query(None),
     tvdbid: Optional[int] = Query(None),
+    tpdbid: Optional[str] = Query(None),
     season: Optional[int] = Query(None),
     ep: Optional[int] = Query(None),
     id: Optional[str] = Query(None),
@@ -83,6 +85,13 @@ async def newznab(
         releases = await query_tmdb_releases(
             session, tmdb_id=tmdbid, imdb_id=imdbid, tvdb_id=tvdbid,
             q=q, content_type="tv", season=season, episode=ep,
+            source_type="usenet", limit=limit, offset=offset,
+        )
+        return await _feed(session, releases)
+
+    if t in ("adult", "adult-search", "adultsearch"):
+        releases = await query_tpdb_releases(
+            session, tpdb_id=tpdbid, q=q,
             source_type="usenet", limit=limit, offset=offset,
         )
         return await _feed(session, releases)

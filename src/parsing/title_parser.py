@@ -88,6 +88,16 @@ def parse_title(raw_title: str) -> ParsedTitle:
             except ValueError:
                 pass
 
+    # Usenet/Spotnet XXX format: "SiteName - Performers SceneTitle [Resolution]"
+    # PTT keeps the whole thing as title and never recognises the site prefix.
+    # Guard: only split when the prefix before " - " is a single word (no spaces),
+    # which distinguishes "TabooHeat - ..." from "Blue Bloods - Season 1" (multi-word).
+    if site_name is None and " - " in title:
+        prefix, rest = title.split(" - ", 1)
+        if prefix and " " not in prefix:
+            site_name = prefix
+            title = rest
+
     # xxxclub title correction: PTT returns only the site name as title when the
     # format is "SiteName YY MM DD Scene Title". Extract the real title from after the date.
     if release_date:

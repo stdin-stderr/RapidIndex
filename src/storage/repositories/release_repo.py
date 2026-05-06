@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.storage.models import PendingEnrichment, Release, ReleaseTmdbTitle, TmdbMetadata, TorrentRelease, UsenetRelease
+from src.storage.models import PendingEnrichment, Release, ReleaseTmdbTitle, ReleaseTpdbScene, TmdbMetadata, TorrentRelease, TpdbScene, UsenetRelease
 
 
 async def upsert_release(
@@ -193,6 +193,34 @@ async def query_tmdb_releases(
         stmt = stmt.distinct()
 
     stmt = stmt.order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def query_tpdb_releases(
+    session: AsyncSession,
+    *,
+    tpdb_id: Optional[str] = None,
+    q: Optional[str] = None,
+    source_type: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[Release]:
+    stmt = (
+        select(Release)
+        .join(ReleaseTpdbScene, ReleaseTpdbScene.release_id == Release.id)
+        .where(Release.content_type == "xxx")
+    )
+    if tpdb_id:
+        stmt = stmt.where(ReleaseTpdbScene.scene_id == UUID(tpdb_id))
+    if q:
+        stmt = stmt.join(TpdbScene, TpdbScene.id == ReleaseTpdbScene.scene_id)
+        stmt = stmt.where(
+            Release.raw_title.ilike(f"%{q}%") | TpdbScene.title.ilike(f"%{q}%")
+        )
+    if source_type:
+        stmt = stmt.where(Release.source_type == source_type)
+    stmt = stmt.distinct().order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

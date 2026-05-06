@@ -22,9 +22,13 @@ from src.storage.models import (
     Release,
     ReleaseTmdbTitle,
     TmdbMetadata,
+    TpdbNetwork,
+    TpdbSite,
 )
 from src.storage.repositories.people_repo import get_cast_for_title, upsert_cast, upsert_person
+from src.storage.repositories.performer_repo import upsert_performer
 from src.storage.repositories.release_repo import claim_enrichment_batch, complete_enrichment, fail_enrichment
+from src.storage.repositories.scene_repo import link_release_to_scene, upsert_scene
 from src.utils.http import get_client
 
 log = logging.getLogger(__name__)
@@ -110,6 +114,75 @@ async def _write_tmdb_match(session, release_id, metadata: dict, parsed) -> None
     await session.commit()
 
 
+async def _write_tpdb_match(session, release_id, metadata: dict, parsed) -> None:
+    """Upsert TpdbScene + site/network/performers, link to release."""
+    now = datetime.now(timezone.utc)
+
+    # 1. Upsert network (FK dep for site)
+    site = metadata.get("site")
+    site_id: int | None = None
+    if site:
+        if network := site.get("network"):
+            await session.execute(
+                insert(TpdbNetwork)
+                .values(id=network["id"], name=network.get("name"), slug=network.get("slug"))
+                .on_conflict_do_update(
+                    index_elements=["id"],
+                    set_={"name": network.get("name"), "slug": network.get("slug")},
+                )
+            )
+            await session.commit()
+
+        # 2. Upsert site
+        site_id = site["id"]
+        network_id = site.get("network", {}).get("id") if site.get("network") else None
+        await session.execute(
+            insert(TpdbSite)
+            .values(
+                id=site_id,
+                name=site.get("name"),
+                slug=site.get("slug"),
+                logo_url=site.get("logo_url"),
+                network_id=network_id,
+            )
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={
+                    "name": site.get("name"),
+                    "slug": site.get("slug"),
+                    "logo_url": site.get("logo_url"),
+                    "network_id": network_id,
+                },
+            )
+        )
+        await session.commit()
+
+    # 3. Upsert scene
+    scene_data = {
+        k: v for k, v in metadata.items()
+        if k not in ("site", "performer_profiles")
+    }
+    scene_data["site_id"] = site_id
+    scene_data["fetched_at"] = now
+    await upsert_scene(session, scene_data)
+
+    # 4. Link release → scene
+    await link_release_to_scene(session, release_id, metadata["id"])
+
+    # 5. Upsert performer rows (normalised table)
+    for profile in metadata.get("performer_profiles") or []:
+        if profile.get("id"):
+            await upsert_performer(session, {**profile, "fetched_at": now})
+
+    # 6. Write back parsed fields to the release row
+    await session.execute(
+        update(Release)
+        .where(Release.id == release_id)
+        .values(quality=parsed.resolution, date=parsed.release_date, updated_at=now)
+    )
+    await session.commit()
+
+
 async def _mark_skipped(session, pending_id: int, release_id) -> None:
     await session.execute(
         update(Release)
@@ -164,6 +237,8 @@ async def _process_item(
         )
         if enricher_type in (EnricherType.TMDB_MOVIE, EnricherType.TMDB_TV):
             await _write_tmdb_match(session, release.id, result.metadata, parsed)
+        elif enricher_type == EnricherType.TPDB:
+            await _write_tpdb_match(session, release.id, result.metadata, parsed)
         await complete_enrichment(
             session,
             pending_id=item.id,
