@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from src.storage.models import Release
 
 _NNS = "http://www.newznab.com/DTD/2010/feeds/attributes/"
-_TNS = "https://torznab.com/feed-specification"
+_TNS = "http://torznab.com/feed-specification"
 
 _CONTENT_TYPE_TO_CAT: dict[str, int] = {
     "movie": 2000,
@@ -143,17 +143,18 @@ def cat_to_content_type(cat_str: str) -> str | None:
     return None
 
 
-def _rss_root(ns_attr: str) -> ET.Element:
+def _rss_root() -> ET.Element:
     ET.register_namespace("newznab", _NNS)
     ET.register_namespace("torznab", _TNS)
     return ET.Element("rss", version="2.0")
 
 
-def _channel(rss: ET.Element, title: str, url: str) -> ET.Element:
+def _channel(rss: ET.Element, title: str, url: str, *, offset: int = 0, total: int = 0) -> ET.Element:
     channel = ET.SubElement(rss, "channel")
     ET.SubElement(channel, "title").text = title
     ET.SubElement(channel, "link").text = url
     ET.SubElement(channel, "description").text = title
+    ET.SubElement(channel, f"{{{_NNS}}}response", offset=str(offset), total=str(total))
     return channel
 
 
@@ -245,9 +246,9 @@ def _add_common_attrs(item: ET.Element, ns: str, r: Release, *, cat: int, size: 
         _add_attr(item, ns, "episode", r.episode)
 
 
-def make_newznab_feed(releases: list[Release], base_url: str) -> Response:
-    rss = _rss_root("newznab")
-    channel = _channel(rss, "RapidIndex", base_url)
+def make_newznab_feed(releases: list[Release], base_url: str, *, offset: int = 0, total: int = 0) -> Response:
+    rss = _rss_root()
+    channel = _channel(rss, "RapidIndex", base_url, offset=offset, total=total)
     for r in releases:
         _newznab_item(channel, r, base_url)
     return _render(rss)
@@ -279,9 +280,9 @@ def _newznab_item(channel: ET.Element, r: Release, base_url: str) -> None:
     _add_attr(item, ns, "usenetdate", _pubdate(r))
 
 
-def make_torznab_feed(releases: list[Release], base_url: str) -> Response:
-    rss = _rss_root("torznab")
-    channel = _channel(rss, "RapidIndex", base_url)
+def make_torznab_feed(releases: list[Release], base_url: str, *, offset: int = 0, total: int = 0) -> Response:
+    rss = _rss_root()
+    channel = _channel(rss, "RapidIndex", base_url, offset=offset, total=total)
     for r in releases:
         _torznab_item(channel, r)
     return _render(rss)
@@ -318,7 +319,7 @@ def _torznab_item(channel: ET.Element, r: Release) -> None:
         _add_attr(item, ns, "magneturl", torrent.magnet_uri)
 
 
-def make_caps_response(is_torznab: bool = False) -> Response:
+def make_caps_response(is_torznab: bool = False, retention_days: int = 0) -> Response:
     caps = ET.Element("caps")
     ET.SubElement(
         caps, "server",
@@ -329,6 +330,8 @@ def make_caps_response(is_torznab: bool = False) -> Response:
         url="",
     )
     ET.SubElement(caps, "limits", max="500", default="100")
+    if not is_torznab and retention_days > 0:
+        ET.SubElement(caps, "retention", days=str(retention_days))
     ET.SubElement(caps, "registration", available="no", open="no")
     searching = ET.SubElement(caps, "searching")
     ET.SubElement(searching, "search", available="yes", supportedParams="q")
@@ -341,6 +344,14 @@ def make_caps_response(is_torznab: bool = False) -> Response:
         supportedParams="q,imdbid,tmdbid,genre,year",
     )
     ET.SubElement(
+        searching, "audio-search", available="no",
+        supportedParams="q",
+    )
+    ET.SubElement(
+        searching, "book-search", available="no",
+        supportedParams="q",
+    )
+    ET.SubElement(
         searching, "adult-search", available="yes",
         supportedParams="q,tpdbid",
     )
@@ -350,6 +361,11 @@ def make_caps_response(is_torznab: bool = False) -> Response:
         for sub_id, sub_name in subcats:
             ET.SubElement(cat_el, "subcat", id=sub_id, name=sub_name)
     return _render(caps)
+
+
+def xml_error(code: int, description: str) -> Response:
+    root = ET.Element("error", code=str(code), description=description)
+    return _render(root)
 
 
 def _render(root: ET.Element) -> Response:

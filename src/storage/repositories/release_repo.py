@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import delete, exists, select, update
+from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -178,6 +178,29 @@ async def search_releases(
     return list(result.scalars().all())
 
 
+async def count_releases(
+    session: AsyncSession,
+    *,
+    q: Optional[str] = None,
+    content_type: Optional[str] = None,
+    quality: Optional[str] = None,
+    source_type: Optional[str] = None,
+    metadata_status: Optional[str] = None,
+) -> int:
+    stmt = select(func.count()).select_from(Release)
+    if q:
+        stmt = stmt.where(Release.raw_title.ilike(f"%{q}%"))
+    if content_type:
+        stmt = stmt.where(Release.content_type == content_type)
+    if quality:
+        stmt = stmt.where(Release.quality == quality)
+    if source_type:
+        stmt = stmt.where(Release.source_type == source_type)
+    if metadata_status:
+        stmt = stmt.where(Release.metadata_status == metadata_status)
+    return await session.scalar(stmt) or 0
+
+
 async def query_tmdb_releases(
     session: AsyncSession,
     *,
@@ -227,6 +250,71 @@ async def query_tmdb_releases(
     stmt = stmt.order_by(Release.indexed_at.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def count_tmdb_releases(
+    session: AsyncSession,
+    *,
+    tmdb_id: Optional[int] = None,
+    imdb_id: Optional[str] = None,
+    tvdb_id: Optional[int] = None,
+    q: Optional[str] = None,
+    content_type: Optional[str] = None,
+    season: Optional[int] = None,
+    episode: Optional[int] = None,
+    source_type: Optional[str] = None,
+) -> int:
+    needs_metadata = imdb_id is not None or tvdb_id is not None or (
+        tmdb_id is None and content_type is not None
+    )
+    base = select(Release.id).join(ReleaseTmdbTitle, ReleaseTmdbTitle.release_id == Release.id)
+    if needs_metadata:
+        base = base.join(TmdbMetadata, TmdbMetadata.tmdb_id == ReleaseTmdbTitle.tmdb_id)
+    if tmdb_id is not None:
+        base = base.where(ReleaseTmdbTitle.tmdb_id == tmdb_id)
+    elif imdb_id is not None:
+        base = base.where(TmdbMetadata.imdb_id == imdb_id)
+    elif tvdb_id is not None:
+        base = base.where(TmdbMetadata.tvdb_id == tvdb_id)
+    if content_type is not None:
+        base = base.where(Release.content_type == content_type)
+        if needs_metadata:
+            base = base.where(TmdbMetadata.tmdb_type == content_type)
+    if season is not None:
+        base = base.where(Release.season == season)
+    if episode is not None:
+        base = base.where(Release.episode == episode)
+    if source_type is not None:
+        base = base.where(Release.source_type == source_type)
+    if q:
+        base = base.where(Release.raw_title.ilike(f"%{q}%"))
+    if needs_metadata:
+        base = base.distinct()
+    return await session.scalar(select(func.count()).select_from(base.subquery())) or 0
+
+
+async def count_tpdb_releases(
+    session: AsyncSession,
+    *,
+    tpdb_id: Optional[str] = None,
+    q: Optional[str] = None,
+    source_type: Optional[str] = None,
+) -> int:
+    base = (
+        select(Release.id)
+        .join(ReleaseTpdbScene, ReleaseTpdbScene.release_id == Release.id)
+        .where(Release.content_type == "xxx")
+    )
+    if tpdb_id:
+        base = base.where(ReleaseTpdbScene.scene_id == UUID(tpdb_id))
+    if q:
+        base = base.join(TpdbScene, TpdbScene.id == ReleaseTpdbScene.scene_id)
+        base = base.where(
+            Release.raw_title.ilike(f"%{q}%") | TpdbScene.title.ilike(f"%{q}%")
+        )
+    if source_type:
+        base = base.where(Release.source_type == source_type)
+    return await session.scalar(select(func.count()).select_from(base.distinct().subquery())) or 0
 
 
 async def query_tpdb_releases(
