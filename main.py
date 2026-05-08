@@ -15,8 +15,12 @@ import asyncio
 import logging
 import sys
 
+from src.config import settings
+
+# Configure logging level from environment
+log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 log = logging.getLogger("main")
@@ -28,14 +32,12 @@ def _session_factory():
 
 
 async def run_worker_mode(enricher_filter: str) -> None:
-    from src.config import settings
     from src.pipeline.enricher_worker import run_worker
     log.info("Starting enricher worker (%s)", enricher_filter)
     await run_worker(_session_factory(), settings, enricher_filter)
 
 
 async def run_ingester(name: str) -> None:
-    from src.config import settings
     from src.pipeline.ingester_scheduler import run_ingesters
 
     if name == "spotnet":
@@ -77,8 +79,7 @@ def main() -> None:
     elif mode == "api":
         import uvicorn
         from src.api.app import app
-        from src.config import settings
-        uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_level="info")
+        uvicorn.run(app, host=settings.api_host, port=settings.api_port, log_level=settings.log_level.lower())
 
     elif mode == "all":
         log.error("Mode 'all' not yet implemented")

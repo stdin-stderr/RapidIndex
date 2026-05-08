@@ -1,3 +1,4 @@
+import logging
 from pydantic_settings import BaseSettings
 
 
@@ -37,6 +38,9 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_base_url: str = "http://localhost:8000"
+
+    # Logging
+    log_level: str = "INFO"
 
     # Stremio
     stremio_enabled: bool = True
