@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}My Library — RapidIndex{% endblock %}
+
+{% block content %}
+<div class="page-bar">
+  <span class="page-bar-title">My Library</span>
+  <span class="page-bar-count" id="lib-count" style="display:none"></span>
+  <span class="page-bar-count" id="lib-service" style="color:var(--t2);margin-left:4px"></span>
+</div>
+
+<div id="lib-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;padding:48px 24px;gap:16px"></div>
+
+<div id="lib-grid-wrap" style="display:none">
+  <div class="scene-grid" id="lib-grid"></div>
+  <div id="lib-unmatched-wrap" style="display:none;padding:0 24px 40px">
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;border-top:1px solid var(--bd);padding-top:16px">
+      In Debrid — Not Matched
+      <span id="lib-unmatched-count" style="font-weight:400;color:var(--t3);margin-left:6px"></span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr>
+        <th style="text-align:left;padding:5px 8px;font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd);white-space:nowrap;font-family:var(--mono)">Title</th>
+        <th style="text-align:left;padding:5px 8px;font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd);white-space:nowrap;font-family:var(--mono)">Hash</th>
+        <th style="text-align:left;padding:5px 8px;font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bd);white-space:nowrap;font-family:var(--mono)">Seeds</th>
+      </tr></thead>
+      <tbody id="lib-unmatched-body"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scene_modal %}{% include "xxx/_scene_modal.html" %}{% endblock %}
+
+{% block scripts %}
+<script>
+let modalItems = [];
+
+function fmt(b) {
+  if (b == null) return '—';
+  const u = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + u[i];
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openModal(idx) {
+  const s = modalItems[idx];
+  const overlay = document.getElementById('modal-overlay');
+  const bg = s.background_url || s.poster_url || '';
+  const heroImg = document.getElementById('modal-img');
+  if (bg) { heroImg.src = bg; heroImg.style.display = ''; }
+  else { heroImg.style.display = 'none'; }
+  document.getElementById('modal-title').textContent = s.title || '(untitled)';
+  const logo = document.getElementById('modal-logo');
+  if (s.site_logo_url) { logo.src = s.site_logo_url; logo.style.display = ''; }
+  else { logo.style.display = 'none'; }
+  const siteLink = document.getElementById('modal-site-name');
+  siteLink.textContent = s.site_name || '';
+  if (s.site_id) { siteLink.href = '/xxx/site/' + encodeURIComponent(s.site_id); }
+  else { siteLink.removeAttribute('href'); }
+  const netEl = document.getElementById('modal-network');
+  netEl.replaceChildren();
+  if (s.network_name) {
+    netEl.appendChild(document.createTextNode('· '));
+    if (s.network_id) {
+      const a = document.createElement('a');
+      a.href = '/xxx/network/' + encodeURIComponent(s.network_id);
+      a.textContent = s.network_name;
+      a.onclick = () => closeModal();
+      netEl.appendChild(a);
+    } else {
+      netEl.appendChild(document.createTextNode(s.network_name));
+    }
+  }
+  document.getElementById('modal-dur').textContent = s.duration_human || '';
+  document.getElementById('modal-date').textContent = s.date || '';
+  const perf = document.getElementById('modal-performers');
+  perf.innerHTML = '';
+  const performers = Array.isArray(s.performers) ? s.performers : Object.values(s.performers || {});
+  if (performers.length) {
+    performers.forEach(p => {
+      const chip = document.createElement('a');
+      chip.className = 'modal-performer';
+      chip.href = p.id ? '/xxx/performer/' + encodeURIComponent(p.id) : '#';
+      const img = document.createElement('img');
+      if (p.image_url || p.poster_url) { img.src = p.image_url || p.poster_url; }
+      img.alt = p.name || '';
+      img.onerror = function() { this.style.display = 'none'; };
+      const name = document.createElement('span');
+      name.textContent = p.name || '';
+      chip.appendChild(img); chip.appendChild(name);
+      perf.appendChild(chip);
+    });
+    perf.style.display = '';
+  } else { perf.style.display = 'none'; }
+  const tagsEl = document.getElementById('modal-tags');
+  tagsEl.innerHTML = '';
+  const tags = Array.isArray(s.tags) ? s.tags : Object.keys(s.tags || {});
+  tags.forEach(t => {
+    const a = document.createElement('a');
+    a.className = 'modal-tag';
+    a.href = '/xxx?tag=' + encodeURIComponent(t);
+    a.textContent = t;
+    a.onclick = () => closeModal();
+    tagsEl.appendChild(a);
+  });
+  document.getElementById('modal-desc').textContent = s.description || '';
+  const watchBtn = document.getElementById('modal-watch-btn');
+  const actionRow = document.getElementById('modal-action-row');
+  if (actionRow && s.torrent_release_id) {
+    watchBtn.href = '/stream/' + encodeURIComponent(s.torrent_release_id);
+    actionRow.style.display = 'flex';
+  } else if (actionRow) { actionRow.style.display = 'none'; }
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function showState(html) {
+  const stateEl = document.getElementById('lib-state');
+  stateEl.innerHTML = html;
+  stateEl.style.display = 'flex';
+  document.getElementById('lib-grid-wrap').style.display = 'none';
+}
+
+function showNoCfg() {
+  showState(`
+    <div style="text-align:center">
+      <div style="font-size:32px;margin-bottom:16px">&#9711;</div>
+      <div style="font-size:16px;font-weight:700;color:var(--t1);margin-bottom:8px">No debrid service configured</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:20px">Connect a debrid service to browse your library.</div>
+      <a href="/configure" style="display:inline-block;background:var(--acc);color:#fff;border-radius:8px;padding:9px 24px;font-size:13px;font-weight:600;text-decoration:none">Configure</a>
+    </div>
+  `);
+}
+
+function showLoading() {
+  showState(`<div style="text-align:center;color:var(--t3);font-size:13px">Loading your debrid library&hellip;</div>`);
+}
+
+function showError(msg) {
+  showState(`<div style="text-align:center;color:var(--acc);font-size:13px">&#9888; ${esc(msg)}</div>`);
+}
+
+function buildCard(s, idx) {
+  const bg = s.background_url || s.poster_url || '';
+  const performers = Array.isArray(s.performers) ? s.performers : Object.values(s.performers || {});
+  const perfNames = performers.map(p => p.name).join(', ');
+  const maxSeeds = s.max_seeders || 0;
+  const card = document.createElement('div');
+  card.className = 'sc-card';
+  card.onclick = () => openModal(idx);
+  card.innerHTML = `
+    <div class="sc-thumb">
+      ${bg ? `<img src="${esc(bg)}" alt="" loading="lazy">` : ''}
+      <div class="sc-overlay"><div class="sc-play">&#9654;</div></div>
+      ${s.duration_human ? `<span class="sc-dur">${esc(s.duration_human)}</span>` : ''}
+    </div>
+    <div class="sc-body">
+      <div class="sc-site-row">
+        ${s.site_logo_url ? `<img class="sc-site-logo" src="${esc(s.site_logo_url)}" alt="${esc(s.site_name||'')}" onerror="this.style.display='none'">` : ''}
+        <span class="sc-site-name">${esc(s.site_name || '')}</span>
+      </div>
+      <div class="sc-title">${esc(s.title || '(untitled)')}</div>
+      ${perfNames ? `<div class="sc-performers">${esc(perfNames)}</div>` : ''}
+      <div class="sc-meta">
+        <span class="sc-date">${esc(s.date || '')}</span>
+        ${s.debrid_added_at ? `<span class="sc-date" title="Added to debrid">&#9711; ${esc(s.debrid_added_at.slice(0,10))}</span>` : ''}
+        <span class="seeds-pill${maxSeeds === 0 ? ' dead' : ''}">${maxSeeds}S</span>
+      </div>
+      ${s.torrent_release_id ? `<div class="sc-actions" onclick="event.stopPropagation()"><a class="act-btn watch" href="/stream/${encodeURIComponent(s.torrent_release_id)}" title="Watch" onclick="event.stopPropagation()">&#9654;</a></div>` : ''}
+    </div>
+  `;
+  return card;
+}
+
+function renderLibrary(data) {
+  const scenes = data.scenes || [];
+  const unmatched = data.unmatched || [];
+  document.getElementById('lib-state').style.display = 'none';
+  document.getElementById('lib-grid-wrap').style.display = '';
+  const countEl = document.getElementById('lib-count');
+  countEl.textContent = scenes.length + ' scene' + (scenes.length !== 1 ? 's' : '');
+  countEl.style.display = '';
+  if (scenes.length === 0 && unmatched.length === 0) {
+    document.getElementById('lib-grid-wrap').style.display = 'none';
+    showState(`<div style="text-align:center;color:var(--t3);font-size:13px">No items from your debrid library were found in the database.</div>`);
+    return;
+  }
+  modalItems = scenes;
+  const grid = document.getElementById('lib-grid');
+  grid.innerHTML = '';
+  scenes.forEach((s, idx) => grid.appendChild(buildCard(s, idx)));
+  if (unmatched.length > 0) {
+    const wrap = document.getElementById('lib-unmatched-wrap');
+    wrap.style.display = '';
+    document.getElementById('lib-unmatched-count').textContent = '(' + unmatched.length + ')';
+    const tbody = document.getElementById('lib-unmatched-body');
+    tbody.innerHTML = '';
+    unmatched.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding:7px 8px;border-bottom:1px solid var(--bd);color:var(--t2)">${esc(t.title||'—')}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:10px;color:var(--t3)">${esc(t.info_hash)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--bd);color:${(t.seeders||0) > 0 ? 'var(--grn)' : 'var(--t3)'}">${t.seeders != null ? t.seeders : ''}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+}
+
+const SVC_NAMES = {realdebrid:'Real-Debrid',alldebrid:'All-Debrid',torbox:'TorBox',premiumize:'Premiumize',debridlink:'Debrid-Link',debrider:'Debrider',easydebrid:'EasyDebrid',offcloud:'Offcloud',pikpak:'PikPak'};
+const cfg = (() => { try { return JSON.parse(localStorage.getItem('debrid_config') || 'null'); } catch { return null; } })();
+
+if (!cfg || !cfg.service || !cfg.key) {
+  showNoCfg();
+} else {
+  document.getElementById('lib-service').textContent = '— ' + (SVC_NAMES[cfg.service] || cfg.service);
+  showLoading();
+  fetch('/api/ui/library?service=' + encodeURIComponent(cfg.service) + '&key=' + encodeURIComponent(cfg.key))
+    .then(r => {
+      if (r.status === 401) throw new Error('Invalid debrid API key. Check your configuration.');
+      if (!r.ok) return r.json().then(d => { throw new Error(d.detail || 'Failed to load library'); });
+      return r.json();
+    })
+    .then(renderLibrary)
+    .catch(err => showError(err.message || String(err)));
+}
+</script>
+{% endblock %}

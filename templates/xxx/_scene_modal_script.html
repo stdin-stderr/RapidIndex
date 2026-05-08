@@ -1,0 +1,131 @@
+<script id="modal-items-data" type="application/json">{{ modal_items_json | safe }}</script>
+<script>
+const modalItems = JSON.parse(document.getElementById('modal-items-data').textContent);
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openModal(idx) {
+  const s = modalItems[idx];
+  const overlay = document.getElementById('modal-overlay');
+
+  const bg = s.background_url || s.poster_url || '';
+  const heroImg = document.getElementById('modal-img');
+  if (bg) { heroImg.src = bg; heroImg.style.display = ''; }
+  else { heroImg.style.display = 'none'; }
+
+  document.getElementById('modal-title').textContent = s.title || '(untitled)';
+
+  const logo = document.getElementById('modal-logo');
+  if (s.site_logo_url) { logo.src = s.site_logo_url; logo.style.display = ''; }
+  else { logo.style.display = 'none'; }
+
+  const siteLink = document.getElementById('modal-site-name');
+  siteLink.textContent = s.site_name || '';
+  if (s.site_uuid) {
+    siteLink.href = '/xxx/site/' + encodeURIComponent(s.site_uuid);
+  } else {
+    siteLink.removeAttribute('href');
+  }
+
+  document.getElementById('modal-dur').textContent = s.duration_human || '';
+  document.getElementById('modal-date').textContent = s.date || '';
+
+  const perf = document.getElementById('modal-performers');
+  perf.innerHTML = '';
+  const performers = Array.isArray(s.performers) ? s.performers : Object.values(s.performers || {});
+  if (performers.length) {
+    performers.forEach(p => {
+      const chip = document.createElement('a');
+      chip.className = 'modal-performer';
+      chip.href = p.uuid ? '/xxx/performer/' + encodeURIComponent(p.uuid) : '#';
+      chip.onclick = () => closeModal();
+      const img = document.createElement('img');
+      if (p.image_url) { img.src = p.image_url; }
+      else { img.style.background = 'var(--s3)'; }
+      img.alt = p.name || '';
+      img.onerror = function() { this.style.display = 'none'; };
+      const name = document.createElement('span');
+      name.textContent = p.name || '';
+      chip.appendChild(img);
+      chip.appendChild(name);
+      perf.appendChild(chip);
+    });
+    perf.style.display = '';
+  } else { perf.style.display = 'none'; }
+
+  const tagsEl = document.getElementById('modal-tags');
+  tagsEl.innerHTML = '';
+  const tags = Array.isArray(s.tags) ? s.tags : Object.keys(s.tags || {});
+  tags.forEach(t => {
+    const tag = typeof t === 'string' ? t : (t.name || '');
+    if (!tag) return;
+    const link = document.createElement('a');
+    link.className = 'modal-tag';
+    link.href = '/xxx?tag=' + encodeURIComponent(tag);
+    link.textContent = tag;
+    link.onclick = () => closeModal();
+    tagsEl.appendChild(link);
+  });
+
+  document.getElementById('modal-desc').textContent = s.description || '';
+
+  const dlEl = document.getElementById('modal-downloads');
+  dlEl.innerHTML = '';
+  const torrents = Array.isArray(s.torrents) ? s.torrents : [];
+  const usenetRels = Array.isArray(s.usenet_releases) ? s.usenet_releases : [];
+  if (torrents.length || usenetRels.length) {
+    function fmtSize(b) {
+      if (!b) return '';
+      const units = ['B','KB','MB','GB','TB'];
+      let v = b;
+      for (const u of units) { if (v < 1024) return v.toFixed(1) + ' ' + u; v /= 1024; }
+      return v.toFixed(1) + ' PB';
+    }
+    torrents.forEach(t => {
+      const row = document.createElement('a');
+      row.className = 'modal-dl-row';
+      row.href = t.magnet || '#';
+      const label = [fmtSize(t.size_bytes), t.seeders != null ? t.seeders + ' seeds' : '', t.leechers != null ? t.leechers + ' leechers' : ''].filter(Boolean).join(' · ');
+      row.innerHTML = '<span class="modal-dl-icon">&#x1F9F2;</span><div class="modal-dl-info"><span class="modal-dl-label">' + esc(t.resolution || 'Torrent') + '</span><span class="modal-dl-name">' + esc(t.title || '') + '</span></div><span class="modal-dl-meta">' + esc(label) + '</span>';
+      dlEl.appendChild(row);
+    });
+    usenetRels.forEach(u => {
+      const row = document.createElement('a');
+      row.className = 'modal-dl-row';
+      row.href = u.nzb_url || '#';
+      row.download = '';
+      const label = [fmtSize(u.size_bytes)].filter(Boolean).join(' · ');
+      row.innerHTML = '<span class="modal-dl-icon">&#x1F4E6;</span><div class="modal-dl-info"><span class="modal-dl-label">' + esc(u.resolution || 'NZB') + '</span><span class="modal-dl-name">' + esc(u.title || '') + '</span></div><span class="modal-dl-meta">' + esc(label) + '</span>';
+      dlEl.appendChild(row);
+    });
+    dlEl.style.display = '';
+  } else {
+    dlEl.style.display = 'none';
+  }
+
+  const actionRow = document.getElementById('modal-action-row');
+  if (actionRow && s.torrent_release_id) {
+    document.getElementById('modal-watch-btn').href = '/stream/' + encodeURIComponent(s.torrent_release_id);
+    actionRow.style.display = 'flex';
+  } else if (actionRow) {
+    actionRow.style.display = 'none';
+  }
+
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>

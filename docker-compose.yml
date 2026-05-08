@@ -1,5 +1,14 @@
 services:
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   db:
     image: postgres:16
     environment:
@@ -29,11 +38,15 @@ services:
     build: .
     command: python main.py api
     env_file: .env
+    environment:
+      REDIS_URL: redis://redis:6379/1
     ports:
       - "8000:8000"
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   worker-tmdb:
     build: .

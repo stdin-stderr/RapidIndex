@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Sites — RapidIndex{% endblock %}
+
+{% block content %}
+<div class="page-bar">
+  <span class="page-bar-title">Sites</span>
+  <span class="page-bar-count">{{ sites | length }}</span>
+  <form class="search-wrap" method="GET" action="/xxx/sites" style="display:flex;gap:6px;max-width:none;flex:1;margin-left:auto;">
+    <div class="search-wrap" style="margin-left:0;flex:1;max-width:320px;">
+      <span class="search-ico">&#128269;</span>
+      <input class="search-input" type="text" name="q" value="{{ q }}" placeholder="Search sites…">
+    </div>
+  </form>
+</div>
+
+<div class="count-bar">{{ sites | length }} site{{ "s" if sites | length != 1 else "" }}</div>
+
+{% if sites %}
+<div class="sites-grid">
+  {% for s in sites %}
+  <a class="site-card" href="/xxx/site/{{ s.id }}">
+    <div class="site-banner">
+      {% if s.logo_url %}
+      <img src="{{ s.logo_url }}" alt="{{ s.name }}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <span class="site-banner-name" style="display:none">{{ s.name }}</span>
+      {% else %}
+      <span class="site-banner-name">{{ s.name }}</span>
+      {% endif %}
+    </div>
+    <div class="site-info">
+      <div class="site-name">{{ s.name }}</div>
+      {% if s.network %}<div class="site-network">{{ s.network.name }}</div>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p style="padding:24px;color:var(--t3)">No sites found.</p>
+{% endif %}
+{% endblock %}

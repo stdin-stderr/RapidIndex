@@ -10,6 +10,7 @@ from src.api.routers import (
     scenes,
     titles,
     torznab,
+    ui,
 )
 
 app = FastAPI(title="RapidIndex", docs_url="/docs", redoc_url=None)
@@ -23,3 +24,4 @@ app.include_router(performers.router, prefix="/rest/v1", tags=["performers"])
 app.include_router(newznab.router, prefix="/newznab", tags=["newznab"])
 app.include_router(torznab.router, prefix="/torznab", tags=["torznab"])
 app.include_router(nzb.router, prefix="/nzb", tags=["nzb"])
+app.include_router(ui.router, tags=["ui"])

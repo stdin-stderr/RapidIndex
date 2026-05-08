@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}XXX Scenes — RapidIndex{% endblock %}
+
+{% block content %}
+<div class="page-bar">
+  <span class="page-bar-title">Scenes</span>
+  <form class="search-wrap" method="GET" action="/xxx" style="display:flex;gap:6px;max-width:none;flex:1;margin-left:auto;">
+    <div class="search-wrap" style="margin-left:0;flex:1;max-width:320px;">
+      <span class="search-ico">&#128269;</span>
+      <input class="search-input" type="text" name="q" value="{{ q }}" placeholder="Search scenes, performers…">
+    </div>
+    <input type="hidden" name="tag" value="{{ tag }}">
+    <input type="hidden" name="sort_by" value="{{ sort_by }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+  </form>
+</div>
+
+<div class="filter-strip">
+  <a class="fpill{% if sort_by == 'seeders' %} active{% endif %}" href="{{ top_url }}">&#9650; Top</a>
+  <a class="fpill{% if sort_by == 'date' %} active{% endif %}" href="{{ latest_url }}">&#128197; Latest</a>
+  {% if tag %}<span class="fpill active">Tag: {{ tag }}</span>{% endif %}
+  <span class="fsep"></span>
+  <div class="adv-bar" style="padding:0;border:none;flex-wrap:nowrap;gap:6px;">
+    <form method="GET" action="/xxx" style="display:contents">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input class="adv-inp" type="text" name="tag" value="{{ tag }}" placeholder="Filter by tag…">
+      <select class="adv-sel" name="per_page">
+        {% for n in [30, 60, 90] %}
+        <option value="{{ n }}"{% if n == per_page %} selected{% endif %}>{{ n }}/page</option>
+        {% endfor %}
+      </select>
+      <button class="adv-go" type="submit">Go</button>
+    </form>
+  </div>
+</div>
+
+{% if scenes %}
+<div class="scene-grid">
+  {% for s in scenes %}
+  {% set max_seeds = s.max_seeders or 0 %}
+  <div class="sc-card" onclick="openModal({{ loop.index0 }})">
+    <div class="sc-thumb">
+      {% set bg = s.background_url or s.poster_url %}
+      {% if bg %}<img src="{{ bg }}" alt="" loading="lazy">{% endif %}
+      <div class="sc-overlay"><div class="sc-play">&#9654;</div></div>
+      {% if s.duration_human %}<span class="sc-dur">{{ s.duration_human }}</span>{% endif %}
+    </div>
+    <div class="sc-body">
+      <div class="sc-site-row">
+        {% if s.site_logo_url %}
+        <img class="sc-site-logo" src="{{ s.site_logo_url }}" alt="{{ s.site_name }}" onerror="this.style.display='none'">
+        {% endif %}
+        <span class="sc-site-name">{{ s.site_name or "" }}</span>
+      </div>
+      <div class="sc-title">{{ s.title or "(untitled)" }}</div>
+      {% set performers = s.performers if s.performers is iterable and s.performers is not string else [] %}
+      {% set perf_names = performers | map(attribute="name") | list %}
+      {% if perf_names %}<div class="sc-performers">{{ perf_names | join(", ") }}</div>{% endif %}
+      <div class="sc-meta">
+        <span class="sc-date">{{ s.date or "" }}</span>
+        <span class="seeds-pill{% if max_seeds == 0 %} dead{% endif %}">{{ max_seeds }}S</span>
+      </div>
+      {% if s.torrent_release_id %}
+      <div class="sc-actions" onclick="event.stopPropagation()">
+        <a class="act-btn watch" href="/stream/{{ s.torrent_release_id }}" title="Watch" onclick="event.stopPropagation()">&#9654;</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p style="padding:24px;color:var(--t3)">No scenes found.</p>
+{% endif %}
+
+<div class="pg-bar">
+  {% if has_prev %}<a class="pg-btn" href="{{ prev_url }}">&larr; Prev</a>{% else %}<span class="pg-btn disabled">&larr; Prev</span>{% endif %}
+  <span class="pg-info">Page {{ page }}</span>
+  {% if has_next %}<a class="pg-btn" href="{{ next_url }}">Next &rarr;</a>{% else %}<span class="pg-btn disabled">Next &rarr;</span>{% endif %}
+</div>
+{% endblock %}
+
+{% block scene_modal %}{% include "xxx/_scene_modal.html" %}{% endblock %}
+{% block scripts %}
+{% set modal_items_json = scenes_json %}
+{% include "xxx/_scene_modal_script.html" %}
+{% endblock %}

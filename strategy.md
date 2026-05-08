@@ -298,7 +298,7 @@ Enable in `.env`: `STREMIO_ENABLED=true`
 api:                  ✅ ACTIVE
 worker:               ✅ ACTIVE
 ingester-spotnet:     ✅ ACTIVE
-ingester-xxxclub:     🔄 STUB (commented)
+ingester-xxxclub:     ✅ ACTIVE
 db:                   ✅ ACTIVE
 migrate:              ✅ ACTIVE
 ```
@@ -309,11 +309,7 @@ migrate:              ✅ ACTIVE
 
 | Step | Task | Status | Estimate | Notes |
 |------|------|--------|----------|-------|
-| 5 | xxxclub torrent ingester | ⏳ TODO | 1-2 days | HTML scraper, BeautifulSoup parsing, watermark tracking. No blockers. |
 | 7 | Stremio addon + debrid clients | ⏳ TODO | 2-3 days | Requires xxxclub (Step 5) for torrent streams. Base64url config encoding built-in. |
-| 8 | Main.py + docker wiring | 🔄 PARTIAL | 0.5 days | Wire xxxclub dispatcher + uncomment docker service (Step 5). Wire Stremio (Step 7). |
-
-**Priority order:** Step 5 (xxxclub) → Step 7 (Stremio) → Step 8 (final wiring).
 
 ---
 

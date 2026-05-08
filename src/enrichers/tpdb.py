@@ -271,9 +271,12 @@ def _extract_metadata(raw: dict) -> dict:
     tags = [t["name"] for t in (raw.get("tags") or []) if t.get("name")]
 
     scene_id_str = raw.get("_id")
-    try:
-        scene_id = uuid.UUID(scene_id_str) if scene_id_str else uuid.uuid4()
-    except (ValueError, AttributeError):
+    if scene_id_str:
+        try:
+            scene_id = uuid.UUID(str(scene_id_str))
+        except (ValueError, AttributeError):
+            scene_id = uuid.uuid5(uuid.NAMESPACE_URL, str(scene_id_str))
+    else:
         scene_id = uuid.uuid4()
 
     return {

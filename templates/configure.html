@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Configure — RapidIndex{% endblock %}
+
+{% block content %}
+<div class="page-bar" style="position:static;border-bottom:none;">
+  <span class="page-bar-title">Configure</span>
+</div>
+<div class="config-page">
+
+  <div class="config-section">
+    <div class="config-section-title">Debrid Service</div>
+    <div class="debrid-grid" id="debrid-grid"></div>
+
+    <form id="debrid-form" style="display:flex;flex-direction:column;gap:12px;max-width:440px;">
+      <div class="config-field">
+        <label class="config-label" id="debrid-key-label">API Key</label>
+        <div class="config-hint">Find your key at <a id="debrid-key-link" href="#" target="_blank" rel="noreferrer" style="color:var(--lnk)"></a></div>
+        <div class="config-row">
+          <input class="config-input" id="debrid-key-input" type="password" placeholder="Paste your API key…" style="flex:1">
+        </div>
+      </div>
+      <div class="config-row">
+        <button type="submit" class="config-btn" id="debrid-connect-btn">Connect</button>
+        <button type="button" class="config-btn secondary" id="debrid-disconnect-btn" style="display:none">Disconnect</button>
+      </div>
+      <div class="config-status" id="debrid-status" style="display:none"></div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DEBRID_SERVICES = [
+  { id:'realdebrid', name:'Real-Debrid',  icon:'RD', desc:'Most popular. Great cache coverage.',    url:'https://real-debrid.com/apitoken',       color:'#c40000' },
+  { id:'alldebrid',  name:'All-Debrid',   icon:'AD', desc:'European service, solid EU cache.',     url:'https://alldebrid.com/apikeys',          color:'#f59e0b' },
+  { id:'torbox',     name:'TorBox',       icon:'TB', desc:'Fast torrent proxy & debrid.',          url:'https://torbox.app/settings',            color:'#6366f1' },
+  { id:'premiumize', name:'Premiumize',   icon:'PM', desc:'Premium cloud storage & debrid.',       url:'https://www.premiumize.me/account',      color:'#10b981' },
+  { id:'debridlink', name:'Debrid-Link',  icon:'DL', desc:'French service, growing cache.',        url:'https://debrid-link.com/webapp/#/key',   color:'#3b82f6' },
+  { id:'offcloud',   name:'Offcloud',     icon:'OC', desc:'Instant cloud downloader.',             url:'https://offcloud.com/#/account',         color:'#8b5cf6' },
+  { id:'pikpak',     name:'PikPak',       icon:'PP', desc:'Fast Asian CDN speeds.',                url:'https://mypikpak.com/',                  color:'#06b6d4' },
+  { id:'easydebrid', name:'EasyDebrid',   icon:'ED', desc:'Lightweight, no-frills debrid.',        url:'https://easydebrid.com/',                color:'#f97316' },
+];
+
+let saved = null;
+try { saved = JSON.parse(localStorage.getItem('debrid_config') || 'null'); } catch {}
+
+let selectedSvc = saved?.service || 'realdebrid';
+
+function renderGrid() {
+  const grid = document.getElementById('debrid-grid');
+  grid.innerHTML = '';
+  DEBRID_SERVICES.forEach(svc => {
+    const isSelected = svc.id === selectedSvc;
+    const isConnected = saved?.service === svc.id;
+    const card = document.createElement('div');
+    card.className = 'debrid-card' + (isSelected ? ' selected' : '') + (isConnected ? ' connected' : '');
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="debrid-icon" style="background:${svc.color}22;color:${svc.color}">${svc.icon}</div>
+        <div>
+          <div class="debrid-name">${svc.name}</div>
+          ${isConnected ? '<div class="debrid-badge">Connected</div>' : ''}
+        </div>
+      </div>
+      <div class="debrid-desc">${svc.desc}</div>
+    `;
+    card.onclick = () => { selectedSvc = svc.id; renderGrid(); updateForm(); };
+    grid.appendChild(card);
+  });
+}
+
+function updateForm() {
+  const svc = DEBRID_SERVICES.find(s => s.id === selectedSvc);
+  document.getElementById('debrid-key-label').textContent = 'API Key — ' + svc.name;
+  document.getElementById('debrid-key-link').href = svc.url;
+  document.getElementById('debrid-key-link').textContent = svc.url;
+  const keyInput = document.getElementById('debrid-key-input');
+  keyInput.value = (saved?.service === selectedSvc) ? (saved?.key || '') : '';
+  const connectBtn = document.getElementById('debrid-connect-btn');
+  const disconnectBtn = document.getElementById('debrid-disconnect-btn');
+  const isConnected = saved?.service === selectedSvc;
+  connectBtn.textContent = isConnected ? 'Reconnect' : 'Connect';
+  disconnectBtn.style.display = isConnected ? '' : 'none';
+  const statusEl = document.getElementById('debrid-status');
+  if (isConnected) {
+    statusEl.className = 'config-status ok';
+    statusEl.textContent = '✓ Connected to ' + svc.name;
+    statusEl.style.display = '';
+  } else {
+    statusEl.style.display = 'none';
+  }
+}
+
+document.getElementById('debrid-form').onsubmit = function(e) {
+  e.preventDefault();
+  const key = document.getElementById('debrid-key-input').value.trim();
+  if (!key) return;
+  const statusEl = document.getElementById('debrid-status');
+  statusEl.className = 'config-status loading';
+  statusEl.textContent = 'Testing connection…';
+  statusEl.style.display = '';
+  document.getElementById('debrid-connect-btn').textContent = 'Connecting…';
+  setTimeout(() => {
+    saved = { service: selectedSvc, key };
+    localStorage.setItem('debrid_config', JSON.stringify(saved));
+    renderGrid();
+    updateForm();
+  }, 800);
+};
+
+document.getElementById('debrid-disconnect-btn').onclick = function() {
+  localStorage.removeItem('debrid_config');
+  saved = null;
+  document.getElementById('debrid-key-input').value = '';
+  renderGrid();
+  updateForm();
+};
+
+renderGrid();
+updateForm();
+</script>
+{% endblock %}

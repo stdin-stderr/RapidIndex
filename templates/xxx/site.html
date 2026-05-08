@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}{{ site.name }} — RapidIndex{% endblock %}
+
+{% block content %}
+{% set banner_sources = [] %}
+{% for s in scenes[:4] %}
+  {% set bg = s.background_url or s.poster_url %}
+  {% if bg %}{% set _ = banner_sources.append(bg) %}{% endif %}
+{% endfor %}
+
+<div class="hero-section">
+  {% if banner_sources %}
+  <div class="hero-bg" style="background-image:url('{{ banner_sources[0] }}')"></div>
+  {% endif %}
+  <div class="hero-content">
+    <div class="hero-logo-wrap">
+      {% if site.logo_url %}
+      <img src="{{ site.logo_url }}" alt="{{ site.name }}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <span class="hero-logo-placeholder" style="display:none">&#127916;</span>
+      {% else %}
+      <span class="hero-logo-placeholder">&#127916;</span>
+      {% endif %}
+    </div>
+    <div class="hero-info">
+      <div class="hero-name">{{ site.name }}</div>
+      {% if site.network %}
+      <div class="hero-sub">
+        Part of <a href="/xxx/network/{{ site.network.id }}">{{ site.network.name }}</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="section-head">Scenes</div>
+
+<div style="padding:8px 24px 0;display:flex;gap:6px;align-items:center;">
+  <form method="GET" action="/xxx/site/{{ site.id }}" style="display:flex;gap:6px;align-items:center;">
+    <div class="search-wrap" style="margin-left:0;max-width:280px;">
+      <span class="search-ico">&#128269;</span>
+      <input class="search-input" type="text" name="q" value="{{ q }}" placeholder="Search this site's scenes…">
+    </div>
+    <select class="adv-sel" name="per_page">
+      {% for n in [30, 60, 90] %}
+      <option value="{{ n }}"{% if n == per_page %} selected{% endif %}>{{ n }}/page</option>
+      {% endfor %}
+    </select>
+    <button class="adv-go" type="submit">Go</button>
+  </form>
+</div>
+
+{% if scenes %}
+<div class="scene-grid" style="padding-top:12px">
+  {% for s in scenes %}
+  {% set max_seeds = s.max_seeders or 0 %}
+  <div class="sc-card" onclick="openModal({{ loop.index0 }})">
+    <div class="sc-thumb">
+      {% set bg = s.background_url or s.poster_url %}
+      {% if bg %}<img src="{{ bg }}" alt="" loading="lazy">{% endif %}
+      <div class="sc-overlay"><div class="sc-play">&#9654;</div></div>
+      {% if s.duration_human %}<span class="sc-dur">{{ s.duration_human }}</span>{% endif %}
+    </div>
+    <div class="sc-body">
+      <div class="sc-title">{{ s.title or "(untitled)" }}</div>
+      {% set performers = s.performers if s.performers is iterable and s.performers is not string else [] %}
+      {% set perf_names = performers | map(attribute="name") | list %}
+      {% if perf_names %}<div class="sc-performers">{{ perf_names | join(", ") }}</div>{% endif %}
+      <div class="sc-meta">
+        <span class="sc-date">{{ s.date or "" }}</span>
+        <span class="seeds-pill{% if max_seeds == 0 %} dead{% endif %}">{{ max_seeds }}S</span>
+      </div>
+      {% if s.torrent_release_id %}
+      <div class="sc-actions" onclick="event.stopPropagation()">
+        <a class="act-btn watch" href="/stream/{{ s.torrent_release_id }}" title="Watch" onclick="event.stopPropagation()">&#9654;</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p style="padding:24px;color:var(--t3)">No scenes found.</p>
+{% endif %}
+
+<div class="pg-bar">
+  {% if has_prev %}<a class="pg-btn" href="{{ prev_url }}">&larr; Prev</a>{% else %}<span class="pg-btn disabled">&larr; Prev</span>{% endif %}
+  <span class="pg-info">Page {{ page }}</span>
+  {% if has_next %}<a class="pg-btn" href="{{ next_url }}">Next &rarr;</a>{% else %}<span class="pg-btn disabled">Next &rarr;</span>{% endif %}
+</div>
+{% endblock %}
+
+{% block scene_modal %}{% include "xxx/_scene_modal.html" %}{% endblock %}
+{% block scripts %}
+{% set modal_items_json = scenes_json %}
+{% include "xxx/_scene_modal_script.html" %}
+{% endblock %}

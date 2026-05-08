@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Performers — RapidIndex{% endblock %}
+
+{% block content %}
+<div class="page-bar">
+  <span class="page-bar-title">Performers</span>
+  <form class="search-wrap" method="GET" action="/xxx/performers" style="display:flex;gap:6px;max-width:none;flex:1;margin-left:auto;">
+    <div class="search-wrap" style="margin-left:0;flex:1;max-width:320px;">
+      <span class="search-ico">&#128269;</span>
+      <input class="search-input" type="text" name="q" value="{{ q }}" placeholder="Search performers…">
+    </div>
+    <select class="adv-sel" name="per_page" onchange="this.form.submit()">
+      {% for n in [48, 96, 192] %}
+      <option value="{{ n }}"{% if n == per_page %} selected{% endif %}>{{ n }}/page</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if performers %}
+<div class="perf-grid">
+  {% for p in performers %}
+  <a class="perf-card" href="/xxx/performer/{{ p.id }}">
+    <div class="perf-portrait">
+      {% if p.poster_url %}
+      <img src="{{ p.poster_url }}" alt="{{ p.name }}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="perf-no-img" style="display:none">&#128100;</div>
+      {% else %}
+      <div class="perf-no-img">&#128100;</div>
+      {% endif %}
+    </div>
+    <div class="perf-info">
+      <div class="perf-name">{{ p.name }}</div>
+      {% if p.gender %}<div class="perf-gender">{{ p.gender }}</div>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p style="padding:24px;color:var(--t3)">No performers found.</p>
+{% endif %}
+
+<div class="pg-bar">
+  {% if has_prev %}<a class="pg-btn" href="{{ prev_url }}">&larr; Prev</a>{% else %}<span class="pg-btn disabled">&larr; Prev</span>{% endif %}
+  <span class="pg-info">Page {{ page }}</span>
+  {% if has_next %}<a class="pg-btn" href="{{ next_url }}">Next &rarr;</a>{% else %}<span class="pg-btn disabled">Next &rarr;</span>{% endif %}
+</div>
+{% endblock %}

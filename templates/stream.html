@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% block title %}Watch — {{ release.raw_title }}{% endblock %}
+
+{% block extra_css %}
+  .watch-layout{display:grid;grid-template-columns:1fr 360px;min-height:calc(100vh - 0px);}
+  @media(max-width:900px){.watch-layout{grid-template-columns:1fr;}}
+
+  .watch-left{display:flex;flex-direction:column;overflow-y:auto;}
+  .watch-player-wrap{width:100%;aspect-ratio:16/9;background:#000;position:relative;flex-shrink:0;}
+  .watch-player-wrap video{width:100%;height:100%;display:block;background:#000;}
+  .watch-poster{position:absolute;inset:0;background-size:cover;background-position:center;}
+  .watch-play-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.4);}
+  .watch-play-btn{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.92);display:flex;align-items:center;justify-content:center;font-size:22px;padding-left:3px;box-shadow:0 4px 24px rgba(0,0,0,.4);}
+  .watch-play-label{font-size:13px;color:rgba(255,255,255,.8);font-weight:500;}
+
+  @keyframes spin{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+  .stream-item-loader{animation:spin 1s linear infinite;}
+
+  .watch-info{padding:18px 20px 14px;background:var(--s1);border-bottom:1px solid var(--bd);}
+  .watch-site-name{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;}
+  .watch-title{font-size:19px;font-weight:700;letter-spacing:-.02em;color:var(--t1);margin-bottom:6px;line-height:1.3;}
+  .watch-meta{display:flex;gap:12px;font-size:12px;font-family:var(--mono);color:var(--t3);margin-bottom:10px;flex-wrap:wrap;}
+  .watch-performers{display:flex;flex-wrap:wrap;gap:5px;}
+  .watch-perf-chip{font-size:12px;color:var(--lnk);padding:3px 10px;background:rgba(143,168,239,.1);border:1px solid rgba(143,168,239,.2);border-radius:16px;text-decoration:none;}
+  .watch-perf-chip:hover{background:rgba(143,168,239,.2);text-decoration:none;}
+  .watch-desc{padding:12px 20px;font-size:13px;color:var(--t2);line-height:1.65;border-bottom:1px solid var(--bd);}
+  .watch-tags-row{display:flex;flex-wrap:wrap;gap:4px;padding:10px 20px;border-bottom:1px solid var(--bd);}
+  .watch-tag{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(143,168,239,.06);color:var(--t3);border:1px solid var(--bd);}
+
+  .streams-col{background:var(--s1);border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow-y:auto;position:sticky;top:0;height:100vh;}
+  .streams-header{padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .streams-title{font-size:13px;font-weight:700;color:var(--t1);flex:1;}
+  .streams-badge{font-size:10px;font-weight:700;font-family:var(--mono);padding:3px 8px;border-radius:6px;background:var(--s3);color:var(--t2);border:1px solid var(--bd);}
+  .streams-change{background:none;border:none;color:var(--lnk);font-size:11px;cursor:pointer;font-family:var(--font);}
+  .streams-change:hover{text-decoration:underline;}
+
+  .stream-setup-inner{padding:16px;display:flex;flex-direction:column;gap:10px;}
+  .stream-setup-inner h3{font-size:13px;font-weight:700;color:var(--t1);}
+  .stream-setup-inner p{font-size:12px;color:var(--t3);line-height:1.5;}
+  .stream-sel{width:100%;background:var(--s2);border:1px solid var(--bd);color:var(--t1);border-radius:7px;padding:8px 10px;font-size:13px;font-family:var(--font);outline:none;}
+  .stream-inp{width:100%;background:var(--s2);border:1px solid var(--bd);color:var(--t1);border-radius:7px;padding:8px 10px;font-size:13px;font-family:var(--font);outline:none;}
+  .stream-inp::placeholder{color:var(--t3);}
+  .stream-inp:focus,.stream-sel:focus{border-color:var(--bd2);}
+  .stream-go-btn{width:100%;background:var(--acc);color:#fff;border:none;border-radius:7px;padding:9px;font-size:13px;font-family:var(--font);font-weight:600;cursor:pointer;}
+  .stream-go-btn:hover{opacity:.85;}
+
+  .stream-list{flex:1;overflow-y:auto;}
+  .stream-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--bd);}
+  .stream-item:last-child{border-bottom:none;}
+  .stream-item:hover{background:var(--s2);}
+  .stream-item.playing{background:var(--s3);}
+  .stream-item-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center;}
+  .stream-item-info{flex:1;min-width:0;}
+  .stream-item-name{font-size:12px;font-weight:500;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .stream-item-meta{font-size:10px;font-family:var(--mono);color:var(--t3);margin-top:2px;display:flex;gap:8px;}
+  .stream-item-res{color:var(--t2);}
+  .stream-status-msg{padding:16px;font-size:12px;color:var(--t3);text-align:center;line-height:1.6;}
+  .stream-error-msg{padding:9px 16px;font-size:12px;color:var(--acc);background:rgba(207,9,0,.08);border-bottom:1px solid rgba(207,9,0,.15);}
+{% endblock %}
+
+{% block content %}
+<script id="release-data" type="application/json">{{ release_json | safe }}</script>
+<script id="services-data" type="application/json">{{ services_json | safe }}</script>
+
+<div class="watch-layout">
+
+  <!-- Left: player + release info -->
+  <div class="watch-left">
+    <div class="watch-player-wrap" id="player-wrap">
+      <video id="player" controls preload="metadata" style="display:none"></video>
+      {% set bg = release_dict.background_url or release_dict.poster_url %}
+      {% if bg %}
+      <div class="watch-poster" id="watch-poster" style="background-image:url('{{ bg }}')"></div>
+      {% endif %}
+      <div class="watch-play-overlay" id="play-overlay">
+        <div class="watch-play-btn">&#9654;</div>
+        <div class="watch-play-label" id="play-label">Select a stream &rarr;</div>
+      </div>
+    </div>
+
+    <div class="watch-info">
+      {% if release_dict.site_name %}
+      <div class="watch-site-name" style="margin-bottom:6px">
+        {% if release_dict.site_logo_url %}
+        <img src="{{ release_dict.site_logo_url }}" style="height:14px;vertical-align:middle;margin-right:4px" onerror="this.style.display='none'">
+        {% endif %}
+        {% if release_dict.site_uuid %}
+        <a href="/xxx/site/{{ release_dict.site_uuid }}" style="color:var(--t3)">{{ release_dict.site_name }}</a>
+        {% else %}
+        {{ release_dict.site_name }}
+        {% endif %}
+      </div>
+      {% endif %}
+      <div class="watch-title">{{ release_dict.title or release.raw_title }}</div>
+      <div class="watch-meta">
+        {% if release_dict.date %}<span>{{ release_dict.date }}</span>{% endif %}
+        {% if release_dict.duration_human %}<span>{{ release_dict.duration_human }}</span>{% endif %}
+        {% if release.quality %}<span>{{ release.quality }}</span>{% endif %}
+      </div>
+      {% if release_dict.performers %}
+      <div class="watch-performers">
+        {% for p in release_dict.performers %}
+        {% if p.uuid %}
+        <a class="watch-perf-chip" href="/xxx/performer/{{ p.uuid }}">{{ p.name }}</a>
+        {% else %}
+        <span class="watch-perf-chip">{{ p.name }}</span>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if release_dict.description %}
+    <div class="watch-desc">{{ release_dict.description }}</div>
+    {% endif %}
+
+    {% if release_dict.tags %}
+    <div class="watch-tags-row">
+      {% for tag in release_dict.tags %}
+      <span class="watch-tag">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: streams -->
+  <div class="streams-col">
+    <div class="streams-header">
+      <span class="streams-title">Streams</span>
+      <span class="streams-badge" id="streams-badge" style="display:none"></span>
+      <button class="streams-change" id="change-service-btn" style="display:none">Change</button>
+      <a href="/configure" title="Configure" style="font-size:11px;color:var(--t3);">&#9881;</a>
+    </div>
+
+    <div id="setup-section">
+      <div class="stream-setup-inner">
+        <h3>Choose a debrid service</h3>
+        <p>Connect a debrid account to stream cached torrents instantly.</p>
+        <form id="setup-form" style="display:flex;flex-direction:column;gap:8px;">
+          <select class="stream-sel" id="service-select">
+            {% for svc_key, svc in debrid_services.items() %}
+            <option value="{{ svc_key }}">{{ svc.name }}</option>
+            {% endfor %}
+          </select>
+          <input class="stream-inp" id="api-key-input" type="password" placeholder="API key…" autocomplete="off">
+          <button type="submit" class="stream-go-btn">Load Streams</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="stream-section" style="display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0;">
+      <div class="stream-error-msg" id="stream-status" style="display:none"></div>
+      <div class="stream-list" id="stream-list">
+        <div class="stream-status-msg" id="stream-loading">Checking cache…</div>
+      </div>
+      <div class="stream-status-msg" id="stream-hint" style="border-top:1px solid var(--bd);">
+        &#x26A1; Cached streams play instantly &mdash; &#x23F3; Uncached torrents are queued
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const releaseData = JSON.parse(document.getElementById('release-data').textContent);
+const services = JSON.parse(document.getElementById('services-data').textContent);
+const STORAGE_KEY = 'debrid_config';
+
+function fmt(b) {
+  if (b == null) return '—';
+  const u = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + u[i];
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function loadConfig() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { return null; }
+}
+
+function showSetup() {
+  document.getElementById('setup-section').style.display = '';
+  document.getElementById('stream-section').style.display = 'none';
+  document.getElementById('streams-badge').style.display = 'none';
+  document.getElementById('change-service-btn').style.display = 'none';
+}
+
+function showStreams(svcName) {
+  document.getElementById('setup-section').style.display = 'none';
+  const sec = document.getElementById('stream-section');
+  sec.style.display = 'flex';
+  if (svcName) {
+    const badge = document.getElementById('streams-badge');
+    badge.textContent = svcName;
+    badge.style.display = '';
+  }
+  document.getElementById('change-service-btn').style.display = '';
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('stream-status');
+  if (msg) { el.textContent = msg; el.style.display = ''; }
+  else { el.style.display = 'none'; }
+}
+
+async function loadStreams(cfg) {
+  const svcName = (services[cfg.service] || {}).name || cfg.service;
+  showStreams(svcName);
+  setStatus('');
+  document.getElementById('stream-loading').style.display = '';
+  document.getElementById('stream-hint').style.display = 'none';
+
+  const torrents = releaseData.torrents || [];
+  const hashes = torrents.map(t => t.info_hash).filter(Boolean);
+  if (!hashes.length) {
+    document.getElementById('stream-loading').textContent = 'No torrent hash available.';
+    return {};
+  }
+
+  let cached = {};
+  try {
+    const resp = await fetch('/api/ui/streams/check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({service: cfg.service, key: cfg.key, hashes})
+    });
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        setStatus('Authentication failed — check your API key.');
+        localStorage.removeItem(STORAGE_KEY);
+        setTimeout(showSetup, 1800);
+        return {};
+      }
+      const err = await resp.json().catch(() => ({}));
+      setStatus('Cache check failed: ' + (err.detail || resp.status));
+      document.getElementById('stream-loading').style.display = 'none';
+      return {};
+    }
+    cached = await resp.json();
+  } catch (e) {
+    setStatus('Network error: ' + e.message);
+    document.getElementById('stream-loading').style.display = 'none';
+    return {};
+  }
+
+  const list = document.getElementById('stream-list');
+  list.innerHTML = '';
+  torrents.forEach(t => {
+    const isCached = !!cached[t.info_hash];
+    const item = document.createElement('div');
+    item.className = 'stream-item';
+    item.dataset.hash = t.info_hash;
+    item.innerHTML = `
+      <span class="stream-item-icon" style="color:${isCached ? 'var(--grn)' : 'var(--t3)'}">${isCached ? '&#x26A1;' : '&#x23F3;'}</span>
+      <div class="stream-item-info">
+        <div class="stream-item-name">${esc(t.title || t.info_hash)}</div>
+        <div class="stream-item-meta">
+          <span class="stream-item-res">${esc(t.resolution || '')}</span>
+          <span>${fmt(t.size_bytes)}</span>
+          <span style="color:${(t.seeders||0) > 0 ? 'var(--grn)' : 'var(--t3)'}">${t.seeders != null ? t.seeders + 'S' : ''}</span>
+          ${!isCached ? '<span style="font-style:italic">not cached</span>' : ''}
+        </div>
+      </div>
+    `;
+    item.addEventListener('click', () => playStream(cfg, t, isCached, item));
+    list.appendChild(item);
+  });
+
+  document.getElementById('stream-loading').style.display = 'none';
+  document.getElementById('stream-hint').style.display = '';
+  return cached;
+}
+
+let pollInterval = null;
+
+async function playStream(cfg, torrent, isCached, item) {
+  if (!isCached) {
+    document.querySelectorAll('#stream-list .stream-item.playing').forEach(r => r.classList.remove('playing'));
+    item.classList.add('playing');
+    setStatus('');
+    document.getElementById('play-label').textContent = 'Queuing download…';
+    if (pollInterval) clearInterval(pollInterval);
+
+    try {
+      const resp = await fetch('/api/ui/queue-stream', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: cfg.service, key: cfg.key, magnet: torrent.magnet})
+      });
+      if (resp.status === 401) {
+        setStatus('Authentication failed — check your API key.');
+        localStorage.removeItem(STORAGE_KEY);
+        setTimeout(showSetup, 1800);
+        item.classList.remove('playing');
+        return;
+      }
+      const data = await resp.json();
+      if (data.status === 'ok' && data.url) { playUrl(data.url); return; }
+      if (data.status === 'queued') {
+        setStatus('Download queued. Checking status…');
+        document.getElementById('play-label').textContent = 'Downloading…';
+        const startTime = Date.now();
+        pollInterval = setInterval(async () => {
+          if (Date.now() - startTime > 10 * 60 * 1000) {
+            clearInterval(pollInterval);
+            setStatus('Download did not complete in time.');
+            item.classList.remove('playing');
+            return;
+          }
+          try {
+            const cr = await fetch('/api/ui/streams/check', {
+              method: 'POST', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({service: cfg.service, key: cfg.key, hashes: [torrent.info_hash]})
+            });
+            if (cr.ok) {
+              const cs = await cr.json();
+              if (cs[torrent.info_hash]) {
+                clearInterval(pollInterval);
+                setStatus('Download complete. Playing…');
+                playStream(cfg, torrent, true, item);
+              }
+            }
+          } catch {}
+        }, 15000);
+        return;
+      }
+      setStatus('Failed: ' + (data.message || 'unknown error'));
+      item.classList.remove('playing');
+    } catch (e) {
+      setStatus('Network error: ' + e.message);
+      item.classList.remove('playing');
+    }
+    return;
+  }
+
+  document.querySelectorAll('#stream-list .stream-item.playing').forEach(r => r.classList.remove('playing'));
+  item.classList.add('playing');
+  setStatus('');
+  document.getElementById('play-label').textContent = 'Resolving stream…';
+
+  const url = '/api/ui/streams/url/' + encodeURIComponent(cfg.service) + '/' + encodeURIComponent(torrent.info_hash) + '?key=' + encodeURIComponent(cfg.key);
+  try {
+    const resp = await fetch(url);
+    if (resp.status === 401) {
+      setStatus('Authentication failed — check your API key.');
+      localStorage.removeItem(STORAGE_KEY);
+      setTimeout(showSetup, 1800);
+      return;
+    }
+    const data = await resp.json();
+    if (data.status === 'pending') { setStatus('Queued for download — try again shortly.'); item.classList.remove('playing'); return; }
+    if (data.status !== 'ok' || !data.url) { setStatus('Could not resolve stream: ' + (data.message || 'unknown error')); item.classList.remove('playing'); return; }
+    playUrl(data.url);
+  } catch (e) {
+    setStatus('Network error: ' + e.message);
+    item.classList.remove('playing');
+  }
+}
+
+function playUrl(url) {
+  const player = document.getElementById('player');
+  player.src = url;
+  player.style.display = '';
+  const poster = document.getElementById('watch-poster');
+  const overlay = document.getElementById('play-overlay');
+  if (poster) poster.style.display = 'none';
+  if (overlay) overlay.style.display = 'none';
+  player.play().catch(() => {});
+}
+
+document.getElementById('setup-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const service = document.getElementById('service-select').value;
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({service, key}));
+  loadStreams({service, key});
+});
+
+document.getElementById('change-service-btn').addEventListener('click', () => {
+  localStorage.removeItem(STORAGE_KEY);
+  const player = document.getElementById('player');
+  player.pause(); player.src = ''; player.style.display = 'none';
+  const poster = document.getElementById('watch-poster');
+  const overlay = document.getElementById('play-overlay');
+  if (poster) poster.style.display = '';
+  if (overlay) overlay.style.display = '';
+  showSetup();
+});
+
+const savedCfg = loadConfig();
+if (savedCfg?.service) {
+  const sel = document.getElementById('service-select');
+  if (sel) sel.value = savedCfg.service;
+}
+if (savedCfg && savedCfg.service && savedCfg.key) {
+  document.getElementById('api-key-input').value = savedCfg.key;
+  loadStreams(savedCfg);
+} else {
+  showSetup();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Releases — RapidIndex{% endblock %}
+
+{% block content %}
+<div class="page-bar">
+  <span class="page-bar-title">Releases</span>
+  <form class="search-wrap" method="GET" action="/releases" style="display:flex;gap:6px;max-width:none;flex:1;margin-left:auto;">
+    <div class="search-wrap" style="margin-left:0;flex:1;max-width:320px;">
+      <span class="search-ico">&#128269;</span>
+      <input class="search-input" type="text" name="q" value="{{ q }}" placeholder="Search releases…">
+    </div>
+    <input type="hidden" name="source_type" value="{{ source_type }}">
+    <input type="hidden" name="content_type" value="{{ content_type }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+  </form>
+</div>
+
+<div class="adv-bar">
+  <form method="GET" action="/releases" style="display:contents">
+    <input type="hidden" name="q" value="{{ q }}">
+    <select class="adv-sel" name="source_type">
+      <option value="">All sources</option>
+      <option value="usenet"{% if source_type == 'usenet' %} selected{% endif %}>Usenet</option>
+      <option value="torrent"{% if source_type == 'torrent' %} selected{% endif %}>Torrent</option>
+    </select>
+    <select class="adv-sel" name="content_type">
+      <option value="">All types</option>
+      <option value="xxx"{% if content_type == 'xxx' %} selected{% endif %}>XXX</option>
+      <option value="movie"{% if content_type == 'movie' %} selected{% endif %}>Movie</option>
+      <option value="tv"{% if content_type == 'tv' %} selected{% endif %}>TV</option>
+      <option value="other"{% if content_type == 'other' %} selected{% endif %}>Other</option>
+    </select>
+    <select class="adv-sel" name="per_page">
+      {% for n in [25, 50, 100] %}
+      <option value="{{ n }}"{% if n == per_page %} selected{% endif %}>{{ n }}/page</option>
+      {% endfor %}
+    </select>
+    <button class="adv-go" type="submit">Filter</button>
+  </form>
+</div>
+
+{% if releases %}
+<div class="torr-wrap">
+  <table class="torr-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Source</th>
+        <th>Type</th>
+        <th>Quality</th>
+        <th>Size</th>
+        <th>Date</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in releases %}
+      <tr>
+        <td style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t1)">
+          {% if r.source_type == 'torrent' %}
+          <a href="/stream/{{ r.id }}" style="color:var(--t1)">{{ r.raw_title }}</a>
+          {% else %}
+          {{ r.raw_title }}
+          {% endif %}
+        </td>
+        <td>
+          <span class="t-badge {{ r.source_type }}">{{ r.source_name or r.source_type }}</span>
+        </td>
+        <td>
+          {% if r.content_type %}
+          <span class="t-badge {{ r.content_type }}">{{ r.content_type }}</span>
+          {% else %}
+          <span class="t-meta-txt">—</span>
+          {% endif %}
+        </td>
+        <td class="t-meta-txt">{{ r.quality or "—" }}</td>
+        <td class="t-meta-txt">{{ r._size_human }}</td>
+        <td class="t-meta-txt">{{ r._date_label }}</td>
+        <td>
+          {% if r.metadata_status == 'enriched' %}
+          <span class="t-badge enriched">enriched</span>
+          {% elif r.metadata_status %}
+          <span class="t-badge pending">{{ r.metadata_status }}</span>
+          {% else %}
+          <span class="t-meta-txt">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p style="padding:24px;color:var(--t3)">No releases found.</p>
+{% endif %}
+
+<div class="pg-bar">
+  {% if has_prev %}<a class="pg-btn" href="{{ prev_url }}">&larr; Prev</a>{% else %}<span class="pg-btn disabled">&larr; Prev</span>{% endif %}
+  <span class="pg-info">Page {{ page }}</span>
+  {% if has_next %}<a class="pg-btn" href="{{ next_url }}">Next &rarr;</a>{% else %}<span class="pg-btn disabled">Next &rarr;</span>{% endif %}
+</div>
+{% endblock %}

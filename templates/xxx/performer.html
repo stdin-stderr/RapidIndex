@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ performer.name }} — RapidIndex{% endblock %}
+
+{% block content %}
+{% set banner_sources = [] %}
+{% for s in scenes[:4] %}
+  {% set bg = s.background_url or s.poster_url %}
+  {% if bg %}{% set _ = banner_sources.append(bg) %}{% endif %}
+{% endfor %}
+{% set hero_bg = performer.poster_url or (banner_sources[0] if banner_sources else None) %}
+
+<div class="hero-section">
+  {% if hero_bg %}
+  <div class="hero-bg" style="background-image:url('{{ hero_bg }}')"></div>
+  {% endif %}
+  <div class="hero-content">
+    {% if performer.poster_url %}
+    <img class="hero-portrait" src="{{ performer.poster_url }}" alt="{{ performer.name }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="hero-no-img" style="display:none">&#128100;</div>
+    {% else %}
+    <div class="hero-no-img">&#128100;</div>
+    {% endif %}
+    <div class="hero-info">
+      <div class="hero-name">{{ performer.name }}</div>
+      <div class="hero-stats">
+        {% if performer.gender %}<span class="hero-stat"><span class="hero-stat-lbl">Gender</span><span class="hero-stat-val">{{ performer.gender }}</span></span>{% endif %}
+        {% if performer.birthday %}<span class="hero-stat"><span class="hero-stat-lbl">Born</span><span class="hero-stat-val">{{ performer.birthday }}</span></span>{% endif %}
+        {% if performer.height_cm %}<span class="hero-stat"><span class="hero-stat-lbl">Height</span><span class="hero-stat-val">{{ performer.height_cm }} cm</span></span>{% endif %}
+        {% if performer.rating %}<span class="hero-stat"><span class="hero-stat-lbl">Rating</span><span class="hero-stat-val">{{ "%.1f"|format(performer.rating) }}</span></span>{% endif %}
+        {% if performer_extra.measurements %}<span class="hero-stat"><span class="hero-stat-lbl">Measurements</span><span class="hero-stat-val">{{ performer_extra.measurements }}</span></span>{% endif %}
+        {% if performer_extra.ethnicity %}<span class="hero-stat"><span class="hero-stat-lbl">Ethnicity</span><span class="hero-stat-val">{{ performer_extra.ethnicity }}</span></span>{% endif %}
+        {% if performer_extra.hair_colour %}<span class="hero-stat"><span class="hero-stat-lbl">Hair</span><span class="hero-stat-val">{{ performer_extra.hair_colour }}</span></span>{% endif %}
+        {% if performer_extra.career_start_year %}<span class="hero-stat"><span class="hero-stat-lbl">Career</span><span class="hero-stat-val">{{ performer_extra.career_start_year }}{% if performer_extra.career_end_year %} – {{ performer_extra.career_end_year }}{% endif %}</span></span>{% endif %}
+      </div>
+      {% if performer_extra.bio %}
+      <div class="hero-bio">{{ performer_extra.bio }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="section-head">Scenes with {{ performer.name }}</div>
+
+{% if scenes %}
+<div class="scene-grid" style="padding-top:12px">
+  {% for s in scenes %}
+  {% set max_seeds = s.max_seeders or 0 %}
+  <div class="sc-card" onclick="openModal({{ loop.index0 }})">
+    <div class="sc-thumb">
+      {% set bg = s.background_url or s.poster_url %}
+      {% if bg %}<img src="{{ bg }}" alt="" loading="lazy">{% endif %}
+      <div class="sc-overlay"><div class="sc-play">&#9654;</div></div>
+      {% if s.duration_human %}<span class="sc-dur">{{ s.duration_human }}</span>{% endif %}
+    </div>
+    <div class="sc-body">
+      <div class="sc-site-row">
+        {% if s.site_logo_url %}
+        <img class="sc-site-logo" src="{{ s.site_logo_url }}" alt="{{ s.site_name }}" onerror="this.style.display='none'">
+        {% endif %}
+        <span class="sc-site-name">{{ s.site_name or "" }}</span>
+      </div>
+      <div class="sc-title">{{ s.title or "(untitled)" }}</div>
+      <div class="sc-meta">
+        <span class="sc-date">{{ s.date or "" }}</span>
+        <span class="seeds-pill{% if max_seeds == 0 %} dead{% endif %}">{{ max_seeds }}S</span>
+      </div>
+      {% if s.torrent_release_id %}
+      <div class="sc-actions" onclick="event.stopPropagation()">
+        <a class="act-btn watch" href="/stream/{{ s.torrent_release_id }}" title="Watch" onclick="event.stopPropagation()">&#9654;</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p style="padding:24px;color:var(--t3)">No scenes found.</p>
+{% endif %}
+
+<div class="pg-bar">
+  {% if has_prev %}<a class="pg-btn" href="{{ prev_url }}">&larr; Prev</a>{% else %}<span class="pg-btn disabled">&larr; Prev</span>{% endif %}
+  <span class="pg-info">Page {{ page }}</span>
+  {% if has_next %}<a class="pg-btn" href="{{ next_url }}">Next &rarr;</a>{% else %}<span class="pg-btn disabled">Next &rarr;</span>{% endif %}
+</div>
+{% endblock %}
+
+{% block scene_modal %}{% include "xxx/_scene_modal.html" %}{% endblock %}
+{% block scripts %}
+{% set modal_items_json = scenes_json %}
+{% include "xxx/_scene_modal_script.html" %}
+{% endblock %}
